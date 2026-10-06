@@ -41,7 +41,7 @@ class Utility(commands.Cog):
             description="Use slash `/` commands to interact with the bot:",
             color=discord.Color.gold()
         )
-        embed.add_field(name="🎵 Music", value="`/join`, `/leave`, `/play [name/url]`, `/skip`, `/stop`", inline=False)
+        embed.add_field(name="🎵 Music", value="`/play`, `/queue`, `/autoplay`, `/mode247`, `/nowplaying`, `/skip`, `/stop`, `/join`, `/leave`", inline=False)
         embed.add_field(name="🛡️ Anti-Nuke & Moderation", value="`Auto Anti-Nuke Active`, `/clear`, `/kick`, `/ban`, `/timeout`", inline=False)
         embed.add_field(name="📊 Utility", value="`/ping`, `/serverinfo`, `/userinfo`, `/help`", inline=False)
         embed.add_field(name="🎮 Fun & Games", value="`/roll`, `/8ball`, `/coinflip`", inline=False)

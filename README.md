@@ -1,27 +1,23 @@
-# All-Rounder Discord Bot (Music with /join, Anti-Nuke, Custom Welcome & Slash Commands)
+# All-Rounder Discord Bot (Advanced Music, 24/7, Queue, Autoplay & Anti-Nuke)
 
 Full-featured modular Discord Bot with Slash Commands (`/`).
 
-## Features Added:
-- 🎵 **Music System (`yt-dlp` + FFmpeg)**:
-  - `/join`: Voice Channel me manual join karne ke liye.
-  - `/leave`: Voice Channel se leave karne ke liye.
-  - `/play <search/URL>`: YouTube se music play karne ke liye (Auto-joins voice channel).
-  - `/skip`: Current song skip karne ke liye.
-  - `/stop`: Music stop karke disconnect hone ke liye.
-- 🛡️ **Anti-Nuke / Anti-Raid System**:
-  - Mass Channel Creation / Deletion Protection.
-  - Mass Ban / Kick Protection.
-- 🖼️ **Fancy Embed Welcome System**:
-  - Custom welcome embed format with thumbnail, member count & channel links.
-- 🔄 **Auto-Push (`auto-push.ps1`)**:
-  - GitHub pe auto-commit aur push.
+## 🎵 Advanced Music Features:
+- **Queue System**: `/queue` se next play hone wale gano ki list dekhein.
+- **Autoplay Toggle**: `/autoplay` command se autoplay ON/OFF karein. Jab queue khatam hogi, bot pehle gana jaise related songs YouTube se dhund kar automatically play karega!
+- **24/7 Mode**: `/mode247` command se 24/7 mode ON/OFF karein. On karne par bot gana khatam hone par bhi voice channel leave nahi karega.
+- **Queue Control Commands**: `/nowplaying`, `/skip`, `/stop`, `/join`, `/leave`, `/play`.
+
+## 🛡️ Other Modules:
+- **Anti-Nuke / Anti-Raid**: Mass Channel Deletion & Ban protection.
+- **Welcome Embed System**: Custom welcome banner format with thumbnails & links.
+- **Moderation, Fun, Utility, Leveling, Support Tickets**.
 
 ## Setup Instructions:
 1. Container/System par dependencies install karein:
    ```bash
-   pip install -r requirements.txt
-   apt-get update && apt-get install -y ffmpeg
+   pip install -U "discord.py[voice]" yt-dlp PyNaCl
+   apt-get update && apt-get install -y ffmpeg libsodium-dev
    ```
 2. Set token in `.env`:
    ```env
