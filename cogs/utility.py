@@ -6,6 +6,24 @@ class Utility(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @app_commands.command(name="owner", description="Get information about the Bot Owner and Bot Details")
+    async def owner_slash(self, interaction: discord.Interaction):
+        bot_user = self.bot.user
+        created_at = discord.utils.format_dt(bot_user.created_at, style="F")
+        relative_created = discord.utils.format_dt(bot_user.created_at, style="R")
+
+        embed = discord.Embed(
+            title="👑 Bot Owner & Information",
+            color=discord.Color.gold()
+        )
+        embed.set_thumbnail(url=bot_user.display_avatar.url)
+        embed.add_field(name="👤 Owner Name", value="**Akram**", inline=False)
+        embed.add_field(name="🤖 Bot Name", value=f"{bot_user.name} ({bot_user.mention})", inline=False)
+        embed.add_field(name="📅 Bot Creation Date", value=f"{created_at} ({relative_created})", inline=False)
+        embed.set_footer(text=f"Bot ID: {bot_user.id}")
+
+        await interaction.response.send_message(embed=embed)
+
     @app_commands.command(name="ping", description="Check bot latency")
     async def ping_slash(self, interaction: discord.Interaction):
         latency = round(self.bot.latency * 1000)
@@ -41,6 +59,7 @@ class Utility(commands.Cog):
             description="Use slash `/` commands to interact with the bot:",
             color=discord.Color.gold()
         )
+        embed.add_field(name="👑 Owner & Info", value="`/owner`", inline=False)
         embed.add_field(name="🎵 Music", value="`/play`, `/queue`, `/autoplay`, `/mode247`, `/nowplaying`, `/skip`, `/stop`, `/join`, `/leave`", inline=False)
         embed.add_field(name="🛡️ Anti-Nuke & Moderation", value="`Auto Anti-Nuke Active`, `/clear`, `/kick`, `/ban`, `/timeout`", inline=False)
         embed.add_field(name="📊 Utility", value="`/ping`, `/serverinfo`, `/userinfo`, `/help`", inline=False)

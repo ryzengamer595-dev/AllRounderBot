@@ -1,17 +1,15 @@
-# All-Rounder Discord Bot (Advanced Music, 24/7, Queue, Autoplay & Anti-Nuke)
+# All-Rounder Discord Bot (Advanced Music, 24/7, Queue, Autoplay & Owner Info)
 
 Full-featured modular Discord Bot with Slash Commands (`/`).
 
-## 🎵 Advanced Music Features:
-- **Queue System**: `/queue` se next play hone wale gano ki list dekhein.
-- **Autoplay Toggle**: `/autoplay` command se autoplay ON/OFF karein. Jab queue khatam hogi, bot pehle gana jaise related songs YouTube se dhund kar automatically play karega!
-- **24/7 Mode**: `/mode247` command se 24/7 mode ON/OFF karein. On karne par bot gana khatam hone par bhi voice channel leave nahi karega.
-- **Queue Control Commands**: `/nowplaying`, `/skip`, `/stop`, `/join`, `/leave`, `/play`.
+## 👑 Owner & Bot Info:
+- `/owner`: Displays Bot Owner (Akram) and Bot Creation Date with custom embed.
 
-## 🛡️ Other Modules:
-- **Anti-Nuke / Anti-Raid**: Mass Channel Deletion & Ban protection.
-- **Welcome Embed System**: Custom welcome banner format with thumbnails & links.
-- **Moderation, Fun, Utility, Leveling, Support Tickets**.
+## 🎵 Advanced Music Features:
+- **Queue System**: `/queue`
+- **Autoplay Toggle**: `/autoplay`
+- **24/7 Mode**: `/mode247`
+- **Queue Control Commands**: `/nowplaying`, `/skip`, `/stop`, `/join`, `/leave`, `/play`.
 
 ## Setup Instructions:
 1. Container/System par dependencies install karein:
