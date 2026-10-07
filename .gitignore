@@ -4,4 +4,3 @@ __pycache__/
 *.db
 downloads/
 *.cache
-yt-oauth2.cache

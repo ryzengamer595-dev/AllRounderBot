@@ -6,6 +6,7 @@ import yt_dlp
 import asyncio
 import collections
 
+# Clean options without broken global username/oauth flags
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'extractaudio': True,
@@ -16,15 +17,13 @@ YTDL_OPTIONS = {
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
-    'quiet': False,
+    'quiet': True,
     'no_warnings': True,
     'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
-    'username': 'oauth2',
-    'password': '',
     'extractor_args': {
         'youtube': {
-            'player_client': ['tvhtml5', 'android', 'ios'],
+            'player_client': ['ios', 'android', 'mweb', 'tvhtml5'],
             'skip': ['hls', 'dash']
         }
     }
@@ -40,6 +39,16 @@ FFMPEG_OPTIONS = {
 
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
 
+# Dedicated clean SoundCloud Extractor
+SOUNDCLOUD_OPTIONS = {
+    'format': 'bestaudio/best',
+    'quiet': True,
+    'no_warnings': True,
+    'default_search': 'scsearch',
+    'nocheckcertificate': True
+}
+sc_ytdl = yt_dlp.YoutubeDL(SOUNDCLOUD_OPTIONS)
+
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
         super().__init__(source, volume)
@@ -54,14 +63,8 @@ class YTDLSource(discord.PCMVolumeTransformer):
         try:
             data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
         except Exception as primary_e:
-            print(f"[YTDL Primary Error]: {primary_e}. Trying Soundcloud fallback...")
-            fallback_opts = {
-                'format': 'bestaudio/best',
-                'quiet': True,
-                'default_search': 'scsearch'
-            }
-            fallback_ytdl = yt_dlp.YoutubeDL(fallback_opts)
-            data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(url, download=not stream))
+            print(f"[YTDL Primary Error]: {primary_e}. Executing SoundCloud clean fallback...")
+            data = await loop.run_in_executor(None, lambda: sc_ytdl.extract_info(url, download=not stream))
 
         if 'entries' in data and data['entries']:
             data = data['entries'][0]
@@ -195,7 +198,7 @@ class Music(commands.Cog):
         else:
             await interaction.response.send_message("❌ I am not in any voice channel.", ephemeral=True)
 
-    @app_commands.command(name="play", description="Play a song or add to queue from YouTube")
+    @app_commands.command(name="play", description="Play a song or add to queue from YouTube or SoundCloud")
     async def play(self, interaction: discord.Interaction, query: str):
         if not interaction.user.voice:
             return await interaction.response.send_message("❌ You must be in a Voice Channel to play music!", ephemeral=True)
@@ -221,14 +224,9 @@ class Music(commands.Cog):
             try:
                 data = await loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
             except Exception as ex:
-                print(f"[YTDL Search Fail]: {ex}. Switching to SoundCloud search fallback...")
-                fallback_opts = {
-                    'format': 'bestaudio/best',
-                    'quiet': True,
-                    'default_search': 'scsearch'
-                }
-                fallback_ytdl = yt_dlp.YoutubeDL(fallback_opts)
-                data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(query, download=False))
+                print(f"[YTDL Search Fail]: {ex}. Switching to SoundCloud clean search fallback...")
+                sc_search = query if query.startswith("http") else f"scsearch:{query}"
+                data = await loop.run_in_executor(None, lambda: sc_ytdl.extract_info(sc_search, download=False))
 
             if 'entries' in data and data['entries']:
                 song_info = data['entries'][0]
@@ -277,7 +275,7 @@ class Music(commands.Cog):
         embed.set_footer(text=f"24/7 Mode: {'ON 🟢' if state.is_247 else 'OFF 🔴'} | Autoplay: {'ON 🟢' if state.autoplay else 'OFF 🔴'}")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="autoplay", description="Enable or Disable YouTube Smart Autoplay")
+    @app_commands.command(name="autoplay", description="Enable or Disable Smart Autoplay")
     async def autoplay_cmd(self, interaction: discord.Interaction):
         state = self.get_state(interaction.guild_id)
         state.autoplay = not state.autoplay
