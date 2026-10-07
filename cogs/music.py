@@ -52,7 +52,7 @@ class GuildMusicState:
         self.queue = collections.deque()
         self.current = None
         self.last_played_title = None
-        self.autoplay = False
+        self.autoplay = True
         self.is_247 = False
         self.text_channel = None
 
@@ -107,7 +107,9 @@ class Music(commands.Cog):
 
         elif state.autoplay and state.last_played_title:
             try:
-                search_query = f"ytsearch:{state.last_played_title} audio song"
+                # Search similar songs based on last played song's title
+                clean_title = state.last_played_title.replace("Official Video", "").replace("MV", "").replace("Song", "")
+                search_query = f"ytsearch5:{clean_title} similar song"
                 data = await self.bot.loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
                 entries = data.get('entries', [])
                 
@@ -120,7 +122,13 @@ class Music(commands.Cog):
                 if next_song:
                     state.queue.append((next_song, self.bot.user))
                     if state.text_channel:
-                        await state.text_channel.send(f"📻 **Autoplay Activated:** Added **{next_song.get('title')}** to queue based on previous song.")
+                        embed = discord.Embed(
+                            title="📻 Smart Autoplay",
+                            description=f"Found similar song based on **{state.last_played_title}**:
+👉 [{next_song.get('title')}]({next_song.get('webpage_url')})",
+                            color=discord.Color.purple()
+                        )
+                        await state.text_channel.send(embed=embed)
                     await self.play_next(guild)
                 else:
                     state.current = None
@@ -135,7 +143,7 @@ class Music(commands.Cog):
             state.current = None
             if not state.is_247:
                 if state.text_channel:
-                    await state.text_channel.send("⏹️ Queue is empty. Leaving voice channel (Turn on `/mode247` to stay connected).")
+                    await state.text_channel.send("⏹️ Queue is empty. Leaving voice channel (Use `/mode247` to stay connected).")
                 await vc.disconnect()
 
     @app_commands.command(name="join", description="Join your current Voice Channel")
@@ -238,19 +246,19 @@ class Music(commands.Cog):
         embed.set_footer(text=f"24/7 Mode: {'ON 🟢' if state.is_247 else 'OFF 🔴'} | Autoplay: {'ON 🟢' if state.autoplay else 'OFF 🔴'}")
         await interaction.response.send_message(embed=embed)
 
-    @app_commands.command(name="autoplay", description="Enable or Disable YouTube Autoplay")
+    @app_commands.command(name="autoplay", description="Enable or Disable YouTube Smart Autoplay")
     async def autoplay_cmd(self, interaction: discord.Interaction):
         state = self.get_state(interaction.guild_id)
         state.autoplay = not state.autoplay
         status = "ENABLED 🟢" if state.autoplay else "DISABLED 🔴"
-        await interaction.response.send_message(f"📻 **Autoplay** mode has been **{status}**!")
+        await interaction.response.send_message(f"📻 **Smart Autoplay** has been **{status}**!")
 
     @app_commands.command(name="mode247", description="Enable or Disable 24/7 Voice Channel Mode")
     async def mode247_cmd(self, interaction: discord.Interaction):
         state = self.get_state(interaction.guild_id)
         state.is_247 = not state.is_247
         status = "ENABLED 🟢" if state.is_247 else "DISABLED 🔴"
-        await interaction.response.send_message(f"🔋 **24/7 Mode** has been **{status}**! (Bot will {'stay in VC' if state.is_247 else 'leave when queue ends'})")
+        await interaction.response.send_message(f"🔋 **24/7 Mode** has been **{status}**!")
 
     @app_commands.command(name="nowplaying", description="Show details of current playing track")
     async def nowplaying(self, interaction: discord.Interaction):

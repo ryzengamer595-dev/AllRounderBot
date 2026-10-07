@@ -32,7 +32,7 @@ class Tickets(commands.Cog):
         self.bot = bot
 
     @app_commands.command(name="setup_ticket", description="Setup support ticket panel")
-    @app_checks = app_commands.checks.has_permissions(administrator=True)
+    @app_commands.checks.has_permissions(administrator=True)
     async def setup_ticket_slash(self, interaction: discord.Interaction):
         embed = discord.Embed(
             title="🎫 Support Tickets",

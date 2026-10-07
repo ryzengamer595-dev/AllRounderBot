@@ -6,6 +6,48 @@ class Utility(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
+    @app_commands.command(name="message", description="Send a custom message to a specific text channel")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def message_channel(self, interaction: discord.Interaction, channel: discord.TextChannel, message: str):
+        try:
+            embed = discord.Embed(
+                description=message,
+                color=discord.Color.blurple()
+            )
+            embed.set_footer(text=f"Sent by {interaction.user.display_name}")
+            await channel.send(embed=embed)
+            await interaction.response.send_message(f"✅ Message successfully sent to {channel.mention}!", ephemeral=True)
+        except Exception as e:
+            await interaction.response.send_message(f"❌ Failed to send message: {e}", ephemeral=True)
+
+    @app_commands.command(name="message_all", description="Broadcast a message to ALL text channels in the server")
+    @app_commands.checks.has_permissions(administrator=True)
+    async def message_all_channels(self, interaction: discord.Interaction, message: str):
+        await interaction.response.defer(ephemeral=True)
+        sent_count = 0
+        failed_count = 0
+
+        embed = discord.Embed(
+            title="📢 Server Announcement",
+            description=message,
+            color=discord.Color.gold()
+        )
+        embed.set_footer(text=f"Broadcasted by {interaction.user.display_name}")
+
+        for text_channel in interaction.guild.text_channels:
+            try:
+                if text_channel.permissions_for(interaction.guild.me).send_messages:
+                    await text_channel.send(embed=embed)
+                    sent_count += 1
+            except Exception:
+                failed_count += 1
+
+        await interaction.followup.send(
+            f"📢 Broadcast Complete!
+✅ Sent to **{sent_count}** text channels.
+❌ Failed in **{failed_count}** channels."
+        )
+
     @app_commands.command(name="owner", description="Get information about the Bot Owner and Bot Details")
     async def owner_slash(self, interaction: discord.Interaction):
         bot_user = self.bot.user
@@ -59,6 +101,7 @@ class Utility(commands.Cog):
             description="Use slash `/` commands to interact with the bot:",
             color=discord.Color.gold()
         )
+        embed.add_field(name="📢 Announcements", value="`/message [channel] [text]`, `/message_all [text]`", inline=False)
         embed.add_field(name="👑 Owner & Info", value="`/owner`", inline=False)
         embed.add_field(name="🎵 Music", value="`/play`, `/queue`, `/autoplay`, `/mode247`, `/nowplaying`, `/skip`, `/stop`, `/join`, `/leave`", inline=False)
         embed.add_field(name="🛡️ Anti-Nuke & Moderation", value="`Auto Anti-Nuke Active`, `/clear`, `/kick`, `/ban`, `/timeout`", inline=False)
