@@ -1,6 +1,5 @@
 import os
 import asyncio
-import glob
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -10,47 +9,16 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
-# Reliable Opus loader for Linux/Cloud containers
-def load_opus_properly():
-    if discord.opus.is_loaded():
-        return True
-        
-    paths = [
-        "libopus.so.0",
-        "libopus.so",
-        "/usr/lib/x86_64-linux-gnu/libopus.so.0",
-        "/usr/lib/libopus.so.0",
-        "/nix/store/*-opus-*/lib/libopus.so.0"
-    ]
-    
-    for path in paths:
-        try:
-            if "*" in path:
-                matches = glob.glob(path)
-                if matches:
-                    discord.opus.load_opus(matches[0])
-                    print(f"🟢 Opus loaded from Nix store: {matches[0]}")
-                    return True
-            else:
-                if os.path.exists(path):
-                    discord.opus.load_opus(path)
-                    print(f"🟢 Opus loaded from: {path}")
-                    return True
-        except Exception:
-            continue
-            
+# Quick & Direct Opus Loader for Nixpacks
+try:
+    discord.opus.load_opus('libopus.so.0')
+    print("🟢 Opus library status: LOADED")
+except Exception:
     try:
-        discord.opus.load_opus('opus')
-        if discord.opus.is_loaded():
-            print("🟢 Opus loaded using default ctypes search!")
-            return True
+        discord.opus.load_opus('libopus.so')
+        print("🟢 Opus library status: LOADED")
     except Exception:
-        pass
-        
-    print("🔴 Opus library status: NOT LOADED")
-    return False
-
-load_opus_properly()
+        print("🔴 Opus library status: NOT LOADED")
 
 intents = discord.Intents.default()
 intents.message_content = True
