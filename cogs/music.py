@@ -5,8 +5,36 @@ from discord.ext import commands
 import yt_dlp
 import asyncio
 import collections
+import urllib.request
+import tarfile
+import shutil
 
-# Pure SoundCloud Search Engine - Zero YouTube Blocking & No Login Required
+# Automatic Static FFmpeg Setup for Railway / Cloud
+FFMPEG_PATH = "ffmpeg"
+if not shutil.which("ffmpeg"):
+    local_ffmpeg = os.path.join(os.getcwd(), "ffmpeg_bin", "ffmpeg")
+    if os.path.exists(local_ffmpeg):
+        FFMPEG_PATH = local_ffmpeg
+    else:
+        try:
+            print("📥 Downloading static FFmpeg binary for cloud environment...")
+            os.makedirs("ffmpeg_bin", exist_ok=True)
+            url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+            tar_path = "ffmpeg.tar.xz"
+            urllib.request.urlretrieve(url, tar_path)
+            with tarfile.open(tar_path, "r:xz") as tar:
+                for member in tar.getmembers():
+                    if member.name.endswith("bin/ffmpeg"):
+                        member.name = os.path.basename(member.name)
+                        tar.extract(member, "ffmpeg_bin")
+                        break
+            os.remove(tar_path)
+            FFMPEG_PATH = os.path.join(os.getcwd(), "ffmpeg_bin", "ffmpeg")
+            os.chmod(FFMPEG_PATH, 0o755)
+            print("✅ FFmpeg successfully setup locally!")
+        except Exception as e:
+            print(f"⚠️ Could not auto-download ffmpeg: {e}")
+
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'extractaudio': True,
@@ -25,7 +53,8 @@ YTDL_OPTIONS = {
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
-    'options': '-vn'
+    'options': '-vn',
+    'executable': FFMPEG_PATH
 }
 
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
@@ -125,7 +154,7 @@ class Music(commands.Cog):
                     if state.text_channel:
                         embed = discord.Embed(
                             title="📻 Smart Autoplay",
-                            description=f"Found similar track:\n👉 [{next_song.get('title')}]({next_song.get('webpage_url')})",
+                            description=f"Found similar track:\\n👉 [{next_song.get('title')}]({next_song.get('webpage_url')})",
                             color=discord.Color.purple()
                         )
                         await state.text_channel.send(embed=embed)
@@ -184,117 +213,3 @@ class Music(commands.Cog):
 
         guild = interaction.guild
         voice_channel = interaction.user.voice.channel
-        vc = guild.voice_client
-        state = self.get_state(guild.id)
-        state.text_channel = interaction.channel
-
-        if not vc or not vc.is_connected():
-            try:
-                vc = await voice_channel.connect()
-            except Exception as e:
-                return await interaction.followup.send(f"❌ Could not connect to Voice Channel: {e}")
-
-        try:
-            loop = self.bot.loop
-            search_query = query if query.startswith("http") else f"scsearch:{query}"
-            
-            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
-
-            if 'entries' in data and data['entries']:
-                song_info = data['entries'][0]
-            else:
-                song_info = data
-
-            if vc.is_playing() or vc.is_paused():
-                state.queue.append((song_info, interaction.user))
-                embed = discord.Embed(
-                    title="📝 Added to Queue",
-                    description=f"[{song_info.get('title')}]({song_info.get('webpage_url', '')})",
-                    color=discord.Color.blue()
-                )
-                embed.add_field(name="Position in Queue", value=str(len(state.queue)))
-                embed.set_footer(text=f"Requested by {interaction.user.display_name}")
-                await interaction.followup.send(embed=embed)
-            else:
-                state.queue.append((song_info, interaction.user))
-                await interaction.followup.send("🔎 Fetching track details and starting playback...")
-                await self.play_next(guild, interaction)
-
-        except Exception as e:
-            await interaction.followup.send(f"❌ Error fetching song details: {e}")
-
-    @app_commands.command(name="queue", description="Show the current music queue")
-    async def queue_cmd(self, interaction: discord.Interaction):
-        state = self.get_state(interaction.guild_id)
-        embed = discord.Embed(title="🎶 Music Queue", color=discord.Color.gold())
-
-        if state.current:
-            embed.add_field(name="▶️ Currently Playing", value=f"[{state.current.title}]({state.current.webpage_url})", inline=False)
-        else:
-            embed.add_field(name="▶️ Currently Playing", value="Nothing playing right now.", inline=False)
-
-        if len(state.queue) == 0:
-            embed.add_field(name="📑 Up Next", value="No songs in queue.", inline=False)
-        else:
-            queue_list = ""
-            for idx, (song, requester) in enumerate(state.queue, start=1):
-                queue_list += f"`{idx}.` [{song.get('title')}]({song.get('webpage_url', '')}) | Req by {requester.mention}\n"
-                if idx >= 10:
-                    queue_list += f"*...and {len(state.queue) - 10} more songs*"
-                    break
-            embed.add_field(name="📑 Up Next", value=queue_list, inline=False)
-
-        embed.set_footer(text=f"24/7 Mode: {'ON 🟢' if state.is_247 else 'OFF 🔴'} | Autoplay: {'ON 🟢' if state.autoplay else 'OFF 🔴'}")
-        await interaction.response.send_message(embed=embed)
-
-    @app_commands.command(name="autoplay", description="Enable or Disable Smart Autoplay")
-    async def autoplay_cmd(self, interaction: discord.Interaction):
-        state = self.get_state(interaction.guild_id)
-        state.autoplay = not state.autoplay
-        status = "ENABLED 🟢" if state.autoplay else "DISABLED 🔴"
-        await interaction.response.send_message(f"📻 **Smart Autoplay** has been **{status}**!")
-
-    @app_commands.command(name="mode247", description="Enable or Disable 24/7 Voice Channel Mode")
-    async def mode247_cmd(self, interaction: discord.Interaction):
-        state = self.get_state(interaction.guild_id)
-        state.is_247 = not state.is_247
-        status = "ENABLED 🟢" if state.is_247 else "DISABLED 🔴"
-        await interaction.response.send_message(f"🔋 **24/7 Mode** has been **{status}**!")
-
-    @app_commands.command(name="nowplaying", description="Show details of current playing track")
-    async def nowplaying(self, interaction: discord.Interaction):
-        state = self.get_state(interaction.guild_id)
-        if state.current:
-            embed = discord.Embed(
-                title="🎵 Now Playing",
-                description=f"[{state.current.title}]({state.current.webpage_url})",
-                color=discord.Color.green()
-            )
-            await interaction.response.send_message(embed=embed)
-        else:
-            await interaction.response.send_message("❌ No song is currently playing.", ephemeral=True)
-
-    @app_commands.command(name="skip", description="Skip the current song")
-    async def skip(self, interaction: discord.Interaction):
-        vc = interaction.guild.voice_client
-        if vc and (vc.is_playing() or vc.is_paused()):
-            vc.stop()
-            await interaction.response.send_message("⏭️ Skipped current track!")
-        else:
-            await interaction.response.send_message("❌ No track is currently playing.", ephemeral=True)
-
-    @app_commands.command(name="stop", description="Stop music and clear queue")
-    async def stop(self, interaction: discord.Interaction):
-        state = self.get_state(interaction.guild_id)
-        state.queue.clear()
-        vc = interaction.guild.voice_client
-        if vc:
-            vc.stop()
-            if not state.is_247:
-                await vc.disconnect()
-            await interaction.response.send_message("⏹️ Stopped playback and cleared queue!")
-        else:
-            await interaction.response.send_message("❌ Bot is not connected to a voice channel.", ephemeral=True)
-
-async def setup(bot):
-    await bot.add_cog(Music(bot))
