@@ -1,7 +1,7 @@
 import os
 import asyncio
 import ctypes
-import ctypes.util
+import urllib.request
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -11,52 +11,48 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
-# Comprehensive manual/auto loader for libopus on Linux containers
-def load_opus_library():
+# Auto-download and load libopus if missing on cloud containers
+def ensure_opus_loaded():
     if discord.opus.is_loaded():
         return True
     
-    # Check common system paths in lightweight containers
+    # Try common local or system paths first
     paths = [
         "libopus.so.0",
         "libopus.so",
-        "libopus-0.x86_64.dll",
         "/usr/lib/x86_64-linux-gnu/libopus.so.0",
         "/usr/lib/libopus.so.0",
-        "/usr/lib/libopus.so",
-        "/usr/local/lib/libopus.so.0",
-        "/nix/store/*-opus-*/lib/libopus.so.0"
+        os.path.join(os.getcwd(), "libopus.so.0")
     ]
     
     for path in paths:
         try:
-            if "*" in path:
-                import glob
-                matches = glob.glob(path)
-                if matches:
-                    discord.opus.load_opus(matches[0])
-                    print(f"✅ Loaded Opus from glob: {matches[0]}")
-                    return True
-            else:
-                discord.opus.load_opus(path)
+            discord.opus.load_opus(path)
+            if discord.opus.is_loaded():
                 print(f"✅ Loaded Opus from path: {path}")
                 return True
         except Exception:
             continue
             
-    # Fallback to ctypes find_library
+    # If not found, download a precompiled libopus.so.0 binary directly into the workspace
     try:
-        opus_name = ctypes.util.find_library('opus')
-        if opus_name:
-            discord.opus.load_opus(opus_name)
-            print(f"✅ Loaded Opus via ctypes: {opus_name}")
+        print("📥 Downloading static libopus library for cloud environment...")
+        lib_path = os.path.join(os.getcwd(), "libopus.so.0")
+        if not os.path.exists(lib_path):
+            url = "https://github.com/ToTheMax/discord-opus-binaries/raw/master/rpi/libopus.so.0" # or a reliable linux binary mirror
+            # Using an alternate direct link or standard Debian shared object
+            urllib.request.urlretrieve("https://raw.githubusercontent.com/Anankkj/opus-binaries/main/libopus.so.0", lib_path)
+        
+        discord.opus.load_opus(lib_path)
+        if discord.opus.is_loaded():
+            print("✅ Successfully downloaded and loaded libopus.so.0 locally!")
             return True
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"⚠️ Failed to auto-download libopus: {e}")
         
     return False
 
-if load_opus_library():
+if ensure_opus_loaded():
     print("🟢 Opus library status: LOADED")
 else:
     print("🔴 Opus library status: NOT LOADED")
