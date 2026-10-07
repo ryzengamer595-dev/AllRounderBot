@@ -107,7 +107,6 @@ class Music(commands.Cog):
 
         elif state.autoplay and state.last_played_title:
             try:
-                # Search similar songs based on last played song's title
                 clean_title = state.last_played_title.replace("Official Video", "").replace("MV", "").replace("Song", "")
                 search_query = f"ytsearch5:{clean_title} similar song"
                 data = await self.bot.loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
@@ -124,8 +123,7 @@ class Music(commands.Cog):
                     if state.text_channel:
                         embed = discord.Embed(
                             title="📻 Smart Autoplay",
-                            description=f"Found similar song based on **{state.last_played_title}**:
-👉 [{next_song.get('title')}]({next_song.get('webpage_url')})",
+                            description=f"Found similar song based on **{state.last_played_title}**:\n👉 [{next_song.get('title')}]({next_song.get('webpage_url')})",
                             color=discord.Color.purple()
                         )
                         await state.text_channel.send(embed=embed)

@@ -1,29 +1,23 @@
-# All-Rounder Discord Bot (Music with Smart Autoplay, /message, /message_all & Anti-Nuke)
+# All-Rounder Discord Bot (Instant Sync, Music, Autoplay, Broadcast & Anti-Nuke)
 
 Full-featured modular Discord Bot with Slash Commands (`/`).
 
+## ⚡ Instant Slash Command Sync:
+- Automatic Instant Guild Sync on start up so commands (`/play`, `/help`, `/message`, etc.) register immediately without global delay!
+
 ## 🎵 Advanced Music Features:
-- **Smart Autoplay (`/autoplay`)**: Jab queue finish ho jayegi, bot automatically pehle song ke title aur artist ke basis par YouTube se similar recommended songs search karke play karega.
-- **Queue System**: `/queue`
-- **24/7 Mode**: `/mode247`
-- **Control Commands**: `/nowplaying`, `/skip`, `/stop`, `/join`, `/leave`, `/play`.
+- `/play <song>`: Play YouTube song / search.
+- `/queue`: Show queue.
+- `/autoplay`: Toggle smart recommendation autoplay.
+- `/mode247`: Toggle 24/7 VC connection.
+- `/join`, `/leave`, `/skip`, `/stop`, `/nowplaying`.
 
-## 📢 New Broadcast Commands:
-- `/message channel:<#channel> message:<text>`: Bot dwara kisi specific channel me message bhejne ke liye (Admins only).
-- `/message_all message:<text>`: Server ke saare text channels me message broadcast karne ke liye (Admins only).
-- `/owner`: Bot owner details (Akram) & creation date.
+## 📢 Broadcast & Utility:
+- `/message`: Send custom embed message to a channel.
+- `/message_all`: Broadcast announcement to all channels.
+- `/owner`: Display owner info (Akram) and creation date.
+- `/ping`, `/serverinfo`, `/userinfo`, `/help`.
 
-## Setup Instructions:
-1. Dependencies install karein:
-   ```bash
-   pip install -U "discord.py[voice]" yt-dlp PyNaCl
-   apt-get update && apt-get install -y ffmpeg libsodium-dev
-   ```
-2. Token set karein `.env` me:
-   ```env
-   DISCORD_TOKEN=your_bot_token_here
-   ```
-3. Run the bot:
-   ```bash
-   python bot.py
-   ```
+## 🛡️ Moderation & Anti-Nuke:
+- Mass channel deletion & ban protection active.
+- `/clear`, `/kick`, `/ban`, `/timeout`.

@@ -43,9 +43,7 @@ class Utility(commands.Cog):
                 failed_count += 1
 
         await interaction.followup.send(
-            f"📢 Broadcast Complete!
-✅ Sent to **{sent_count}** text channels.
-❌ Failed in **{failed_count}** channels."
+            f"📢 Broadcast Complete!\n✅ Sent to **{sent_count}** text channels.\n❌ Failed in **{failed_count}** channels."
         )
 
     @app_commands.command(name="owner", description="Get information about the Bot Owner and Bot Details")

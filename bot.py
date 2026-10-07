@@ -30,11 +30,20 @@ async def on_ready():
     print("Status   : ONLINE")
     print("=" * 45)
 
+    # Instant Syncing for All Guilds
+    for guild in bot.guilds:
+        try:
+            bot.tree.copy_global_to(guild=guild)
+            synced = await bot.tree.sync(guild=guild)
+            print(f"✅ Instantly synced {len(synced)} commands to guild: {guild.name} ({guild.id})")
+        except Exception as e:
+            print(f"⚠️ Failed to sync to guild {guild.name}: {e}")
+
     try:
-        synced = await bot.tree.sync()
-        print(f"Synced {len(synced)} Slash Commands (/).")
+        global_synced = await bot.tree.sync()
+        print(f"🌐 Globally synced {len(global_synced)} Slash Commands.")
     except Exception as e:
-        print(f"Failed to sync slash commands: {e}")
+        print(f"⚠️ Global sync error: {e}")
 
     activity = discord.Game(name="All-Rounder Bot | /help")
     await bot.change_presence(status=discord.Status.online, activity=activity)
