@@ -6,7 +6,7 @@ import yt_dlp
 import asyncio
 import collections
 
-# Clean options without broken global username/oauth flags
+# Pure SoundCloud Search Engine - Zero YouTube Blocking & No Login Required
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'extractaudio': True,
@@ -19,18 +19,9 @@ YTDL_OPTIONS = {
     'logtostderr': False,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'ytsearch',
-    'source_address': '0.0.0.0',
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['ios', 'android', 'mweb', 'tvhtml5'],
-            'skip': ['hls', 'dash']
-        }
-    }
+    'default_search': 'scsearch',
+    'source_address': '0.0.0.0'
 }
-
-if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 50:
-    YTDL_OPTIONS['cookiefile'] = 'cookies.txt'
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
@@ -38,16 +29,6 @@ FFMPEG_OPTIONS = {
 }
 
 ytdl = yt_dlp.YoutubeDL(YTDL_OPTIONS)
-
-# Dedicated clean SoundCloud Extractor
-SOUNDCLOUD_OPTIONS = {
-    'format': 'bestaudio/best',
-    'quiet': True,
-    'no_warnings': True,
-    'default_search': 'scsearch',
-    'nocheckcertificate': True
-}
-sc_ytdl = yt_dlp.YoutubeDL(SOUNDCLOUD_OPTIONS)
 
 class YTDLSource(discord.PCMVolumeTransformer):
     def __init__(self, source, *, data, volume=0.5):
@@ -60,11 +41,7 @@ class YTDLSource(discord.PCMVolumeTransformer):
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=True):
         loop = loop or asyncio.get_event_loop()
-        try:
-            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        except Exception as primary_e:
-            print(f"[YTDL Primary Error]: {primary_e}. Executing SoundCloud clean fallback...")
-            data = await loop.run_in_executor(None, lambda: sc_ytdl.extract_info(url, download=not stream))
+        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
 
         if 'entries' in data and data['entries']:
             data = data['entries'][0]
@@ -133,7 +110,7 @@ class Music(commands.Cog):
         elif state.autoplay and state.last_played_title:
             try:
                 clean_title = state.last_played_title.replace("Official Video", "").replace("MV", "").replace("Song", "")
-                search_query = f"ytsearch5:{clean_title} similar song"
+                search_query = f"scsearch5:{clean_title} audio"
                 data = await self.bot.loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
                 entries = data.get('entries', [])
                 
@@ -148,7 +125,7 @@ class Music(commands.Cog):
                     if state.text_channel:
                         embed = discord.Embed(
                             title="📻 Smart Autoplay",
-                            description=f"Found similar song based on **{state.last_played_title}**:\n👉 [{next_song.get('title')}]({next_song.get('webpage_url')})",
+                            description=f"Found similar track:\n👉 [{next_song.get('title')}]({next_song.get('webpage_url')})",
                             color=discord.Color.purple()
                         )
                         await state.text_channel.send(embed=embed)
@@ -198,7 +175,7 @@ class Music(commands.Cog):
         else:
             await interaction.response.send_message("❌ I am not in any voice channel.", ephemeral=True)
 
-    @app_commands.command(name="play", description="Play a song or add to queue from YouTube or SoundCloud")
+    @app_commands.command(name="play", description="Play any song from SoundCloud (Instant & Unblocked)")
     async def play(self, interaction: discord.Interaction, query: str):
         if not interaction.user.voice:
             return await interaction.response.send_message("❌ You must be in a Voice Channel to play music!", ephemeral=True)
@@ -219,14 +196,9 @@ class Music(commands.Cog):
 
         try:
             loop = self.bot.loop
-            search_query = query if query.startswith("http") else f"ytsearch:{query}"
+            search_query = query if query.startswith("http") else f"scsearch:{query}"
             
-            try:
-                data = await loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
-            except Exception as ex:
-                print(f"[YTDL Search Fail]: {ex}. Switching to SoundCloud clean search fallback...")
-                sc_search = query if query.startswith("http") else f"scsearch:{query}"
-                data = await loop.run_in_executor(None, lambda: sc_ytdl.extract_info(sc_search, download=False))
+            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
 
             if 'entries' in data and data['entries']:
                 song_info = data['entries'][0]
