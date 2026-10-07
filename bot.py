@@ -9,6 +9,16 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
+# Explicitly load Opus for Discord Voice
+if not discord.opus.is_loaded():
+    for lib in ["libopus.so.0", "libopus.so", "opus", "libopus-0.dll"]:
+        try:
+            discord.opus.load_opus(lib)
+            print(f"✅ Successfully loaded Opus library: {lib}")
+            break
+        except Exception:
+            pass
+
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
