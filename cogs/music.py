@@ -6,7 +6,7 @@ import yt_dlp
 import asyncio
 import collections
 
-# Optimized YTDL options with web_embedded and android client fallbacks
+# YTDL Options with OAuth2 enable for YouTube
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'extractaudio': True,
@@ -17,13 +17,15 @@ YTDL_OPTIONS = {
     'nocheckcertificate': True,
     'ignoreerrors': False,
     'logtostderr': False,
-    'quiet': True,
+    'quiet': False,
     'no_warnings': True,
     'default_search': 'ytsearch',
     'source_address': '0.0.0.0',
+    'username': 'oauth2',
+    'password': '',
     'extractor_args': {
         'youtube': {
-            'player_client': ['ios', 'android', 'web_creator', 'mweb'],
+            'player_client': ['tvhtml5', 'android', 'ios'],
             'skip': ['hls', 'dash']
         }
     }
@@ -52,11 +54,14 @@ class YTDLSource(discord.PCMVolumeTransformer):
         loop = loop or asyncio.get_event_loop()
         try:
             data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
-        except Exception:
-            # Fallback extractor without cookie if cookie invalidated
-            fallback_opts = dict(YTDL_OPTIONS)
-            fallback_opts.pop('cookiefile', None)
-            fallback_opts['extractor_args'] = {'youtube': {'player_client': ['ios', 'android_vr']}}
+        except Exception as primary_e:
+            print(f"[YTDL Primary Error]: {primary_e}. Trying Soundcloud fallback...")
+            # Fallback search on SoundCloud if YouTube restricts
+            fallback_opts = {
+                'format': 'bestaudio/best',
+                'quiet': True,
+                'default_search': 'scsearch'
+            }
             fallback_ytdl = yt_dlp.YoutubeDL(fallback_opts)
             data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(url, download=not stream))
 
@@ -218,12 +223,14 @@ class Music(commands.Cog):
             try:
                 data = await loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
             except Exception as ex:
-                # Automatic Fallback Client Search
-                fallback_opts = dict(YTDL_OPTIONS)
-                fallback_opts.pop('cookiefile', None)
-                fallback_opts['extractor_args'] = {'youtube': {'player_client': ['ios', 'android_vr']}}
+                print(f"[YTDL Search Fail]: {ex}. Switching to SoundCloud search fallback...")
+                fallback_opts = {
+                    'format': 'bestaudio/best',
+                    'quiet': True,
+                    'default_search': 'scsearch'
+                }
                 fallback_ytdl = yt_dlp.YoutubeDL(fallback_opts)
-                data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(search_query, download=False))
+                data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(query, download=False))
 
             if 'entries' in data and data['entries']:
                 song_info = data['entries'][0]

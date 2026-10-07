@@ -3,3 +3,5 @@ __pycache__/
 *.pyc
 *.db
 downloads/
+*.cache
+yt-oauth2.cache
