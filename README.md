@@ -1,23 +1,25 @@
-# All-Rounder Discord Bot (Instant Sync, Music, Autoplay, Broadcast & Anti-Nuke)
+# All-Rounder Discord Bot (Bypass YouTube Sign-in Bot Check, Multi-Client Player, Instant Sync & Anti-Nuke)
 
 Full-featured modular Discord Bot with Slash Commands (`/`).
 
-## ⚡ Instant Slash Command Sync:
-- Automatic Instant Guild Sync on start up so commands (`/play`, `/help`, `/message`, etc.) register immediately without global delay!
+## 🛡️ YouTube Anti-Bot Bypass Included:
+- Configured with `android`, `ios`, `mweb`, `tvhtml5` player clients to bypass Cloud Hosting IP blocks (`Sign in to confirm you're not a bot`).
+- Optional `cookies.txt` support enabled (place exported YouTube `cookies.txt` in the root directory if needed).
 
-## 🎵 Advanced Music Features:
-- `/play <song>`: Play YouTube song / search.
-- `/queue`: Show queue.
-- `/autoplay`: Toggle smart recommendation autoplay.
-- `/mode247`: Toggle 24/7 VC connection.
-- `/join`, `/leave`, `/skip`, `/stop`, `/nowplaying`.
+## ⚡ Features & Commands:
+- **Instant Guild Sync**: Instant `/` slash command registration across servers.
+- **Music & Autoplay**: `/play`, `/queue`, `/autoplay`, `/mode247`, `/join`, `/leave`, `/skip`, `/stop`, `/nowplaying`.
+- **Broadcast & Info**: `/message`, `/message_all`, `/owner` (Owner: Akram), `/help`, `/ping`, `/serverinfo`, `/userinfo`.
+- **Security & Welcome**: Anti-Nuke protection & Custom Welcome embeds.
 
-## 📢 Broadcast & Utility:
-- `/message`: Send custom embed message to a channel.
-- `/message_all`: Broadcast announcement to all channels.
-- `/owner`: Display owner info (Akram) and creation date.
-- `/ping`, `/serverinfo`, `/userinfo`, `/help`.
-
-## 🛡️ Moderation & Anti-Nuke:
-- Mass channel deletion & ban protection active.
-- `/clear`, `/kick`, `/ban`, `/timeout`.
+## Setup Instructions:
+1. Dependencies install karein:
+   ```bash
+   pip install -U "discord.py[voice]" yt-dlp PyNaCl
+   apt-get update && apt-get install -y ffmpeg libsodium-dev
+   ```
+2. Token set karein `.env` file me.
+3. Run the bot:
+   ```bash
+   python bot.py
+   ```

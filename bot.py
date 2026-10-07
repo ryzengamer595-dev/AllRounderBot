@@ -30,7 +30,6 @@ async def on_ready():
     print("Status   : ONLINE")
     print("=" * 45)
 
-    # Instant Syncing for All Guilds
     for guild in bot.guilds:
         try:
             bot.tree.copy_global_to(guild=guild)

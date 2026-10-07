@@ -1,3 +1,4 @@
+import os
 import discord
 from discord import app_commands
 from discord.ext import commands
@@ -18,8 +19,17 @@ YTDL_OPTIONS = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'ytsearch',
-    'source_address': '0.0.0.0'
+    'source_address': '0.0.0.0',
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['android', 'ios', 'mweb', 'tvhtml5'],
+            'skip': ['hls', 'dash']
+        }
+    }
 }
+
+if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 100:
+    YTDL_OPTIONS['cookiefile'] = 'cookies.txt'
 
 FFMPEG_OPTIONS = {
     'before_options': '-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5',
