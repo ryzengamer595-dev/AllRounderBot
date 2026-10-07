@@ -9,6 +9,7 @@ import urllib.request
 import tarfile
 import shutil
 
+# Robust FFmpeg binary downloader for cloud environments
 FFMPEG_PATH = "ffmpeg"
 if not shutil.which("ffmpeg"):
     local_ffmpeg = os.path.join(os.getcwd(), "ffmpeg_bin", "ffmpeg")
@@ -16,23 +17,27 @@ if not shutil.which("ffmpeg"):
         FFMPEG_PATH = local_ffmpeg
     else:
         try:
-            print("📥 Downloading static FFmpeg binary...")
+            print("📥 Downloading static FFmpeg binary from reliable mirror...")
             os.makedirs("ffmpeg_bin", exist_ok=True)
-            url = "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-linux64-gpl.tar.xz"
+            # Using a direct static build link
+            url = "https://johnvansickle.com/ffmpeg/releases/ffmpeg-release-amd64-static.tar.xz"
             tar_path = "ffmpeg.tar.xz"
             urllib.request.urlretrieve(url, tar_path)
+            
             with tarfile.open(tar_path, "r:xz") as tar:
                 for member in tar.getmembers():
-                    if member.name.endswith("bin/ffmpeg"):
-                        member.name = os.path.basename(member.name)
+                    if member.name.endswith("/ffmpeg"):
+                        member.name = "ffmpeg"
                         tar.extract(member, "ffmpeg_bin")
                         break
-            os.remove(tar_path)
+            if os.path.exists(tar_path):
+                os.remove(tar_path)
+                
             FFMPEG_PATH = os.path.join(os.getcwd(), "ffmpeg_bin", "ffmpeg")
             os.chmod(FFMPEG_PATH, 0o755)
-            print("✅ FFmpeg setup complete!")
+            print("✅ FFmpeg successfully downloaded and configured!")
         except Exception as e:
-            print(f"⚠️ FFmpeg download error: {e}")
+            print(f"⚠️ FFmpeg auto-download failed: {e}")
 
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
@@ -127,8 +132,11 @@ class Music(commands.Cog):
                     embed.set_footer(text=f"Requested by {requester.display_name}")
                     await state.text_channel.send(embed=embed)
             except Exception as e:
+                import traceback
+                error_details = traceback.format_exc()
+                print(f"Detailed Play Error:\n{error_details}")
                 if state.text_channel:
-                    await state.text_channel.send(f"❌ Error playing song: {e}")
+                    await state.text_channel.send(f"❌ Error playing song: `{str(e) or type(e).__name__}`")
                 await self.play_next(guild)
 
         elif state.autoplay and state.last_played_title:
