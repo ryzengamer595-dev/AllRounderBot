@@ -6,6 +6,7 @@ import yt_dlp
 import asyncio
 import collections
 
+# Optimized YTDL options with web_embedded and android client fallbacks
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'extractaudio': True,
@@ -19,10 +20,16 @@ YTDL_OPTIONS = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'ytsearch',
-    'source_address': '0.0.0.0'
+    'source_address': '0.0.0.0',
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['ios', 'android', 'web_creator', 'mweb'],
+            'skip': ['hls', 'dash']
+        }
+    }
 }
 
-if os.path.exists("cookies.txt"):
+if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 50:
     YTDL_OPTIONS['cookiefile'] = 'cookies.txt'
 
 FFMPEG_OPTIONS = {
@@ -43,9 +50,17 @@ class YTDLSource(discord.PCMVolumeTransformer):
     @classmethod
     async def from_url(cls, url, *, loop=None, stream=True):
         loop = loop or asyncio.get_event_loop()
-        data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+        try:
+            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
+        except Exception:
+            # Fallback extractor without cookie if cookie invalidated
+            fallback_opts = dict(YTDL_OPTIONS)
+            fallback_opts.pop('cookiefile', None)
+            fallback_opts['extractor_args'] = {'youtube': {'player_client': ['ios', 'android_vr']}}
+            fallback_ytdl = yt_dlp.YoutubeDL(fallback_opts)
+            data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(url, download=not stream))
 
-        if 'entries' in data:
+        if 'entries' in data and data['entries']:
             data = data['entries'][0]
 
         filename = data['url'] if stream else ytdl.prepare_filename(data)
@@ -80,7 +95,7 @@ class Music(commands.Cog):
         if len(state.queue) > 0:
             song_info, requester = state.queue.popleft()
             try:
-                player = await YTDLSource.from_url(song_info['webpage_url'] or song_info['title'], loop=self.bot.loop, stream=True)
+                player = await YTDLSource.from_url(song_info.get('webpage_url') or song_info.get('title'), loop=self.bot.loop, stream=True)
                 state.current = player
                 state.last_played_title = player.title
 
@@ -199,7 +214,16 @@ class Music(commands.Cog):
         try:
             loop = self.bot.loop
             search_query = query if query.startswith("http") else f"ytsearch:{query}"
-            data = await loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
+            
+            try:
+                data = await loop.run_in_executor(None, lambda: ytdl.extract_info(search_query, download=False))
+            except Exception as ex:
+                # Automatic Fallback Client Search
+                fallback_opts = dict(YTDL_OPTIONS)
+                fallback_opts.pop('cookiefile', None)
+                fallback_opts['extractor_args'] = {'youtube': {'player_client': ['ios', 'android_vr']}}
+                fallback_ytdl = yt_dlp.YoutubeDL(fallback_opts)
+                data = await loop.run_in_executor(None, lambda: fallback_ytdl.extract_info(search_query, download=False))
 
             if 'entries' in data and data['entries']:
                 song_info = data['entries'][0]
