@@ -19,16 +19,10 @@ YTDL_OPTIONS = {
     'quiet': True,
     'no_warnings': True,
     'default_search': 'ytsearch',
-    'source_address': '0.0.0.0',
-    'extractor_args': {
-        'youtube': {
-            'player_client': ['android', 'ios', 'mweb', 'tvhtml5'],
-            'skip': ['hls', 'dash']
-        }
-    }
+    'source_address': '0.0.0.0'
 }
 
-if os.path.exists("cookies.txt") and os.path.getsize("cookies.txt") > 100:
+if os.path.exists("cookies.txt"):
     YTDL_OPTIONS['cookiefile'] = 'cookies.txt'
 
 FFMPEG_OPTIONS = {

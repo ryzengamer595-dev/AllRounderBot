@@ -1,10 +1,9 @@
-# All-Rounder Discord Bot (Bypass YouTube Sign-in Bot Check, Multi-Client Player, Instant Sync & Anti-Nuke)
+# All-Rounder Discord Bot (Authenticated YouTube Music, Instant Sync & Anti-Nuke)
 
 Full-featured modular Discord Bot with Slash Commands (`/`).
 
-## 🛡️ YouTube Anti-Bot Bypass Included:
-- Configured with `android`, `ios`, `mweb`, `tvhtml5` player clients to bypass Cloud Hosting IP blocks (`Sign in to confirm you're not a bot`).
-- Optional `cookies.txt` support enabled (place exported YouTube `cookies.txt` in the root directory if needed).
+## 🎵 Authenticated YouTube Music:
+- Includes valid `cookies.txt` authentication to completely bypass YouTube's cloud hosting IP blocks and bot verification errors.
 
 ## ⚡ Features & Commands:
 - **Instant Guild Sync**: Instant `/` slash command registration across servers.
