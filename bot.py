@@ -1,7 +1,6 @@
 import os
 import asyncio
-import ctypes
-import urllib.request
+import glob
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -11,41 +10,47 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
-# Self-healing Opus loader
-def setup_opus():
+# Reliable Opus loader for Linux/Cloud containers
+def load_opus_properly():
     if discord.opus.is_loaded():
         return True
         
-    local_opus = os.path.join(os.getcwd(), "libopus.so.0")
-    if not os.path.exists(local_opus):
-        try:
-            print("📥 Downloading libopus.so.0 binary for container...")
-            url = "https://github.com/eugeneware/discord-opus-binaries/raw/master/linux/x64/libopus.so"
-            urllib.request.urlretrieve(url, local_opus)
-        except Exception as e:
-            print(f"⚠️ Could not download libopus: {e}")
-            
     paths = [
-        local_opus,
         "libopus.so.0",
         "libopus.so",
         "/usr/lib/x86_64-linux-gnu/libopus.so.0",
-        "/usr/lib/libopus.so.0"
+        "/usr/lib/libopus.so.0",
+        "/nix/store/*-opus-*/lib/libopus.so.0"
     ]
     
     for path in paths:
-        if os.path.exists(path) or "libopus" in path:
-            try:
-                discord.opus.load_opus(path)
-                if discord.opus.is_loaded():
-                    print(f"🟢 Opus library status: LOADED from {path}")
+        try:
+            if "*" in path:
+                matches = glob.glob(path)
+                if matches:
+                    discord.opus.load_opus(matches[0])
+                    print(f"🟢 Opus loaded from Nix store: {matches[0]}")
                     return True
-            except Exception:
-                continue
-                
+            else:
+                if os.path.exists(path):
+                    discord.opus.load_opus(path)
+                    print(f"🟢 Opus loaded from: {path}")
+                    return True
+        except Exception:
+            continue
+            
+    try:
+        discord.opus.load_opus('opus')
+        if discord.opus.is_loaded():
+            print("🟢 Opus loaded using default ctypes search!")
+            return True
+    except Exception:
+        pass
+        
+    print("🔴 Opus library status: NOT LOADED")
     return False
 
-setup_opus()
+load_opus_properly()
 
 intents = discord.Intents.default()
 intents.message_content = True
@@ -110,7 +115,6 @@ async def main():
             print("⚠️ WARNING: Please set DISCORD_TOKEN in .env file!")
             return
             
-        # Safe startup loop to handle temporary network/rate-limit blocks smoothly
         while True:
             try:
                 print("Connecting to Discord...")
