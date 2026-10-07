@@ -1,6 +1,7 @@
 import os
 import asyncio
 import ctypes
+import urllib.request
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -10,12 +11,44 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
-# Direct system path load for Railway Aptfile
-try:
-    discord.opus.load_opus('/usr/lib/x86_64-linux-gnu/libopus.so.0')
-    print("🟢 Opus library status: LOADED")
-except Exception as e:
-    print(f"🔴 Opus library status: NOT LOADED ({e})")
+# Self-healing Opus loader: downloads libopus directly if missing
+def setup_opus():
+    if discord.opus.is_loaded():
+        return True
+        
+    local_opus = os.path.join(os.getcwd(), "libopus.so.0")
+    
+    # If not present in workspace, download it automatically from a reliable repository
+    if not os.path.exists(local_opus):
+        try:
+            print("📥 Downloading libopus.so.0 binary for container...")
+            url = "https://github.com/eugeneware/discord-opus-binaries/raw/master/linux/x64/libopus.so"
+            urllib.request.urlretrieve(url, local_opus)
+        except Exception as e:
+            print(f"⚠️ Could not download libopus: {e}")
+            
+    # Try loading from workspace or system paths
+    paths = [
+        local_opus,
+        "libopus.so.0",
+        "libopus.so",
+        "/usr/lib/x86_64-linux-gnu/libopus.so.0",
+        "/usr/lib/libopus.so.0"
+    ]
+    
+    for path in paths:
+        if os.path.exists(path) or "libopus" in path:
+            try:
+                discord.opus.load_opus(path)
+                if discord.opus.is_loaded():
+                    print(f"🟢 Opus library status: LOADED from {path}")
+                    return True
+            except Exception:
+                continue
+                
+    return False
+
+setup_opus()
 
 intents = discord.Intents.default()
 intents.message_content = True
