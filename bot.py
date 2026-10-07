@@ -1,5 +1,6 @@
 import os
 import asyncio
+import ctypes.util
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -9,15 +10,28 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
-# Explicitly load Opus for Discord Voice
+# Force load libopus for Railway / Cloud container
+opus_named = ctypes.util.find_library('opus')
+if opus_named:
+    try:
+        discord.opus.load_opus(opus_named)
+        print(f"✅ Successfully loaded Opus library via find_library: {opus_named}")
+    except Exception as e:
+        print(f"⚠️ Failed to load Opus via find_library: {e}")
+
 if not discord.opus.is_loaded():
-    for lib in ["libopus.so.0", "libopus.so", "opus", "libopus-0.dll"]:
+    for lib in ["libopus.so.0", "libopus.so", "opus", "/usr/lib/x86_64-linux-gnu/libopus.so.0", "/usr/lib/libopus.so.0"]:
         try:
             discord.opus.load_opus(lib)
-            print(f"✅ Successfully loaded Opus library: {lib}")
+            print(f"✅ Successfully loaded Opus library from path: {lib}")
             break
         except Exception:
             pass
+
+if discord.opus.is_loaded():
+    print("🟢 Opus library status: LOADED")
+else:
+    print("🔴 Opus library status: NOT LOADED (Voice may fail)")
 
 intents = discord.Intents.default()
 intents.message_content = True
