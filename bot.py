@@ -11,14 +11,12 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
-# Self-healing Opus loader: downloads libopus directly if missing
+# Self-healing Opus loader
 def setup_opus():
     if discord.opus.is_loaded():
         return True
         
     local_opus = os.path.join(os.getcwd(), "libopus.so.0")
-    
-    # If not present in workspace, download it automatically from a reliable repository
     if not os.path.exists(local_opus):
         try:
             print("📥 Downloading libopus.so.0 binary for container...")
@@ -27,7 +25,6 @@ def setup_opus():
         except Exception as e:
             print(f"⚠️ Could not download libopus: {e}")
             
-    # Try loading from workspace or system paths
     paths = [
         local_opus,
         "libopus.so.0",
@@ -111,7 +108,27 @@ async def main():
         await load_extensions()
         if not TOKEN or TOKEN == "your_bot_token_here":
             print("⚠️ WARNING: Please set DISCORD_TOKEN in .env file!")
-        await bot.start(TOKEN)
+            return
+            
+        # Safe startup loop to handle temporary network/rate-limit blocks smoothly
+        while True:
+            try:
+                print("Connecting to Discord...")
+                await bot.start(TOKEN)
+                break
+            except discord.errors.HTTPException as e:
+                if e.status == 429:
+                    print("⚠️ Hit Cloudflare Rate Limit (429/1015). Waiting 60 seconds before retrying...")
+                    await asyncio.sleep(60)
+                else:
+                    print(f"HTTP Exception encountered: {e}")
+                    await asyncio.sleep(10)
+            except Exception as e:
+                print(f"Connection error: {e}. Retrying in 15 seconds...")
+                await asyncio.sleep(15)
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped manually.")
