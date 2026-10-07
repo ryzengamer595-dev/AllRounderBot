@@ -6,7 +6,6 @@ import yt_dlp
 import asyncio
 import collections
 
-# YTDL Options with OAuth2 enable for YouTube
 YTDL_OPTIONS = {
     'format': 'bestaudio/best',
     'extractaudio': True,
@@ -56,7 +55,6 @@ class YTDLSource(discord.PCMVolumeTransformer):
             data = await loop.run_in_executor(None, lambda: ytdl.extract_info(url, download=not stream))
         except Exception as primary_e:
             print(f"[YTDL Primary Error]: {primary_e}. Trying Soundcloud fallback...")
-            # Fallback search on SoundCloud if YouTube restricts
             fallback_opts = {
                 'format': 'bestaudio/best',
                 'quiet': True,
