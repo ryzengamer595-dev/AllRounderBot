@@ -24,7 +24,6 @@ class TicketControlView(discord.ui.View):
     def __init__(self, staff_role_id: int = None):
         super().__init__(timeout=None)
         self.staff_role_id = staff_role_id
-        self.claimed_by = None
 
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary, emoji="🙋‍♂️", custom_id="claim_ticket_btn")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
@@ -33,7 +32,6 @@ class TicketControlView(discord.ui.View):
                 await interaction.response.send_message("❌ Aapke paas is ticket ko claim karne ke liye Staff role nahi hai!", ephemeral=True)
                 return
 
-        self.claimed_by = interaction.user
         button.disabled = True
         button.label = f"Claimed by {interaction.user.name}"
         button.style = discord.ButtonStyle.secondary
@@ -59,19 +57,13 @@ class TicketDynamicView(discord.ui.View):
         self.staff_role_id = staff_role_id
         
         for idx, opt in enumerate(options_data):
-            label = opt.get("label", f"Support {idx+1}")
+            label = opt.get("label", "Create Ticket")
             emoji = opt.get("emoji", "🎫")
-            style_str = opt.get("style", "green")
-            
-            style = discord.ButtonStyle.green
-            if style_str == "red": style = discord.ButtonStyle.danger
-            elif style_str == "blue": style = discord.ButtonStyle.primary
-            elif style_str == "grey": style = discord.ButtonStyle.secondary
             
             button = discord.ui.Button(
                 label=label,
                 emoji=emoji,
-                style=style,
+                style=discord.ButtonStyle.green,
                 custom_id=f"ticket_opt_{idx}"
             )
             button.callback = self.create_callback(opt)
@@ -80,15 +72,14 @@ class TicketDynamicView(discord.ui.View):
     def create_callback(self, opt_info):
         async def callback(interaction: discord.Interaction):
             guild = interaction.guild
-            category_name = opt_info.get("category", "Tickets")
-            category = discord.utils.get(guild.categories, name=category_name)
+            category = discord.utils.get(guild.categories, name="Tickets")
             
             if not category:
-                category = await guild.create_category(category_name)
+                category = await guild.create_category("Tickets")
                 
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
-                interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
+                interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True),
                 guild.me: discord.PermissionOverwrite(read_messages=True, send_messages=True)
             }
             
@@ -110,87 +101,82 @@ class TicketDynamicView(discord.ui.View):
             )
             
             embed = discord.Embed(
-                title=f"Support: {opt_info.get('label')}",
-                description=f"Welcome {interaction.user.mention}!\n{opt_info.get('desc', 'Please describe your issue.')}\n\nStaff will be with you shortly.",
+                title="Support Ticket",
+                description=f"Welcome {interaction.user.mention}!\nStaff jald hi aapse judege.",
                 color=discord.Color.blue()
             )
-            embed.set_footer(text="Use buttons below to manage this ticket.")
             
             await channel.send(embed=embed, view=TicketControlView(self.staff_role_id))
-            await interaction.response.send_message(f"✅ Your ticket has been created: {channel.mention}", ephemeral=True)
+            await interaction.response.send_message(f"✅ Ticket ban gaya hai: {channel.mention}", ephemeral=True)
             
         return callback
+
+class TicketSetupModal(discord.ui.Modal, title="Ticket Panel Setup Menu"):
+    def __init__(self, staff_role):
+        super().__init__()
+        self.staff_role = staff_role
+
+    panel_title = discord.ui.TextInput(label="Panel Title", placeholder="Support Center", default="Support Center", required=True)
+    panel_desc = discord.ui.TextInput(label="Panel Description / Guidelines", style=discord.TextStyle.paragraph, placeholder="Yahan guidelines ya description likhein...", default="Kisi bhi madad ke liye button par click karein!", required=True)
+    btn_text = discord.ui.TextInput(label="Button Text", placeholder="Create Ticket", default="Create Ticket", required=True)
+    btn_emoji = discord.ui.TextInput(label="Button Emoji", placeholder="🎫", default="🎫", required=True)
+    banner = discord.ui.TextInput(label="Banner Image URL (Optional)", placeholder="https://...", required=False)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        guild_id = str(interaction.guild.id)
+        config = load_config()
+        if guild_id not in config:
+            config[guild_id] = {}
+
+        config[guild_id]["staff_role_id"] = self.staff_role.id
+        config[guild_id]["title"] = self.panel_title.value
+        config[guild_id]["description"] = self.panel_desc.value
+        
+        options = [{
+            "label": self.btn_text.value,
+            "emoji": self.btn_emoji.value
+        }]
+        config[guild_id]["options"] = options
+        save_config(config)
+
+        embed = discord.Embed(
+            title=self.panel_title.value,
+            description=self.panel_desc.value,
+            color=discord.Color.blurple()
+        )
+        if self.banner.value:
+            embed.set_image(url=self.banner.value)
+        embed.set_footer(text=f"{interaction.guild.name} • Support Center")
+
+        view = TicketDynamicView(options, self.staff_role.id)
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Ticket panel successfully deploy ho gaya!", ephemeral=True)
 
 class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
-        self.config = load_config()
 
-    ticket_group = app_commands.Group(name="ticket", description="Advanced Ticket Management Commands")
-
-    @ticket_group.command(name="setup", description="Custom banner, title, staff role aur custom button text/emoji ke sath panel banayein")
+    @app_commands.command(name="ticketsetup", description="Menu kholkar ticket panel setup karein")
     @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(
-        title="Panel Title",
-        description="Panel Description / Guidelines",
-        staff_role="Staff Role jise ticket access milega",
-        button_text="Custom Ticket Button ka Text (e.g. Create Ticket)",
-        button_emoji="Custom Button Emoji (e.g. 🎫)",
-        banner_url="Optional Banner Image URL"
-    )
-    async def ticket_setup(
-        self, 
-        interaction: discord.Interaction, 
-        title: str, 
-        description: str, 
-        staff_role: discord.Role,
-        button_text: str = "Create Ticket",
-        button_emoji: str = "🎫",
-        banner_url: str = None
-    ):
-        guild_id = str(interaction.guild.id)
-        if guild_id not in self.config:
-            self.config[guild_id] = {}
-            
-        self.config[guild_id]["staff_role_id"] = staff_role.id
-        self.config[guild_id]["title"] = title
-        self.config[guild_id]["description"] = description
-        self.config[guild_id]["banner_url"] = banner_url
-        
-        # Custom button aur text ke sath option set kiya hai
-        custom_options = [
-            {"label": button_text, "emoji": button_emoji, "style": "green", "category": "Tickets", "desc": description}
-        ]
-        self.config[guild_id]["options"] = custom_options
-        save_config(self.config)
+    @app_commands.describe(staff_role="Staff Role jise ticket ka access milega")
+    async def ticketsetup(self, interaction: discord.Interaction, staff_role: discord.Role):
+        await interaction.response.send_modal(TicketSetupModal(staff_role))
 
-        embed = discord.Embed(title=title, description=description, color=discord.Color.blurple())
-        if banner_url:
-            embed.set_image(url=banner_url)
-        embed.set_footer(text=f"{interaction.guild.name} • Support Center")
-
-        view = TicketDynamicView(custom_options, staff_role.id)
-        
-        await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ Ticket panel successfully deployed with your custom button text and emoji!", ephemeral=True)
-
-    @ticket_group.command(name="add", description="Ticket channel me kisi user ko add karein")
+    @app_commands.command(name="ticketadd", description="Ticket me user add karein")
     @app_commands.describe(user="Jis user ko add karna hai")
     async def ticket_add(self, interaction: discord.Interaction, user: discord.Member):
         if not interaction.channel.name.startswith("ticket-"):
-            await interaction.response.send_message("❌ Ye command sirf ticket channels ke andar kaam karegi!", ephemeral=True)
+            await interaction.response.send_message("❌ Ye command sirf ticket channels me kaam karegi!", ephemeral=True)
             return
-            
         await interaction.channel.set_permissions(user, read_messages=True, send_messages=True)
         await interaction.response.send_message(f"✅ Successfully added {user.mention} to this ticket.")
 
-    @ticket_group.command(name="remove", description="Ticket channel se kisi user ko remove karein")
+    @app_commands.command(name="ticketremove", description="Ticket se user remove karein")
     @app_commands.describe(user="Jis user ko remove karna hai")
     async def ticket_remove(self, interaction: discord.Interaction, user: discord.Member):
         if not interaction.channel.name.startswith("ticket-"):
-            await interaction.response.send_message("❌ Ye command sirf ticket channels ke andar kaam karegi!", ephemeral=True)
+            await interaction.response.send_message("❌ Ye command sirf ticket channels me kaam karegi!", ephemeral=True)
             return
-            
         await interaction.channel.set_permissions(user, overwrite=None)
         await interaction.response.send_message(f"🔒 Successfully removed {user.mention} from this ticket.")
 
