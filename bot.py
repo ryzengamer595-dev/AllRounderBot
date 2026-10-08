@@ -9,17 +9,6 @@ load_dotenv()
 TOKEN = os.getenv("DISCORD_TOKEN")
 PREFIX = "!"
 
-# Quick & Direct Opus Loader for Nixpacks
-try:
-    discord.opus.load_opus('libopus.so.0')
-    print("🟢 Opus library status: LOADED")
-except Exception:
-    try:
-        discord.opus.load_opus('libopus.so')
-        print("🟢 Opus library status: LOADED")
-    except Exception:
-        print("🔴 Opus library status: NOT LOADED")
-
 intents = discord.Intents.default()
 intents.message_content = True
 intents.members = True
@@ -38,14 +27,14 @@ async def on_ready():
     print(f"Bot Name : {bot.user}")
     print(f"Bot ID   : {bot.user.id}")
     print(f"Servers  : {len(bot.guilds)}")
-    print("Status   : ONLINE")
+    print("Status   : ONLINE (Music-Free & All-Rounder)")
     print("=" * 45)
 
     for guild in bot.guilds:
         try:
             bot.tree.copy_global_to(guild=guild)
             synced = await bot.tree.sync(guild=guild)
-            print(f"✅ Instantly synced {len(synced)} commands to guild: {guild.name} ({guild.id})")
+            print(f"✅ Synced {len(synced)} commands to guild: {guild.name}")
         except Exception as e:
             print(f"⚠️ Failed to sync to guild {guild.name}: {e}")
 
@@ -55,7 +44,7 @@ async def on_ready():
     except Exception as e:
         print(f"⚠️ Global sync error: {e}")
 
-    activity = discord.Game(name="All-Rounder Bot | /help")
+    activity = discord.Game(name="Managing Server | /help")
     await bot.change_presence(status=discord.Status.online, activity=activity)
 
 async def load_extensions():
@@ -67,7 +56,7 @@ async def load_extensions():
         "cogs.tickets",
         "cogs.welcome",
         "cogs.antinuke",
-        "cogs.music"
+        "cogs.announcement"
     ]
     for cog in cogs:
         try:
@@ -90,10 +79,10 @@ async def main():
                 break
             except discord.errors.HTTPException as e:
                 if e.status == 429:
-                    print("⚠️ Hit Cloudflare Rate Limit (429/1015). Waiting 60 seconds before retrying...")
+                    print("⚠️ Hit Cloudflare Rate Limit (429/1015). Waiting 60 seconds...")
                     await asyncio.sleep(60)
                 else:
-                    print(f"HTTP Exception encountered: {e}")
+                    print(f"HTTP Exception: {e}")
                     await asyncio.sleep(10)
             except Exception as e:
                 print(f"Connection error: {e}. Retrying in 15 seconds...")
