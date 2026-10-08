@@ -28,7 +28,6 @@ class TicketControlView(discord.ui.View):
 
     @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary, emoji="🙋‍♂️", custom_id="claim_ticket_btn")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
-        # Check staff role if configured
         if self.staff_role_id and not any(role.id == self.staff_role_id for role in interaction.user.roles):
             if not interaction.user.guild_permissions.administrator:
                 await interaction.response.send_message("❌ Aapke paas is ticket ko claim karne ke liye Staff role nahi hai!", ephemeral=True)
@@ -87,7 +86,6 @@ class TicketDynamicView(discord.ui.View):
             if not category:
                 category = await guild.create_category(category_name)
                 
-            # Permissions
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
                 interaction.user: discord.PermissionOverwrite(read_messages=True, send_messages=True, attach_files=True),
@@ -99,7 +97,6 @@ class TicketDynamicView(discord.ui.View):
                 if staff_role:
                     overwrites[staff_role] = discord.PermissionOverwrite(read_messages=True, send_messages=True)
 
-            # Check existing ticket for user in this category
             channel_name = f"ticket-{interaction.user.name.lower()}"
             existing = discord.utils.get(guild.text_channels, name=channel_name)
             if existing:
@@ -131,12 +128,14 @@ class Tickets(commands.Cog):
 
     ticket_group = app_commands.Group(name="ticket", description="Advanced Ticket Management Commands")
 
-    @ticket_group.command(name="setup", description="Custom banner, title, staff role aur 1-5 options ke sath ticket panel banayein")
+    @ticket_group.command(name="setup", description="Custom banner, title, staff role aur custom button text/emoji ke sath panel banayein")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(
         title="Panel Title",
         description="Panel Description / Guidelines",
         staff_role="Staff Role jise ticket access milega",
+        button_text="Custom Ticket Button ka Text (e.g. Create Ticket)",
+        button_emoji="Custom Button Emoji (e.g. 🎫)",
         banner_url="Optional Banner Image URL"
     )
     async def ticket_setup(
@@ -145,9 +144,10 @@ class Tickets(commands.Cog):
         title: str, 
         description: str, 
         staff_role: discord.Role,
+        button_text: str = "Create Ticket",
+        button_emoji: str = "🎫",
         banner_url: str = None
     ):
-        # Save config
         guild_id = str(interaction.guild.id)
         if guild_id not in self.config:
             self.config[guild_id] = {}
@@ -157,30 +157,22 @@ class Tickets(commands.Cog):
         self.config[guild_id]["description"] = description
         self.config[guild_id]["banner_url"] = banner_url
         
-        # Default 5 Professional Options (Jaise screenshot me hote hain)
-        default_options = [
-            {"label": "General Support", "emoji": "🟢", "style": "green", "category": "Tickets", "desc": "Get help with general server questions."},
-            {"label": "Player Reports", "emoji": "❌", "style": "red", "category": "Reports", "desc": "Report a rule breaker or misconduct."},
-            {"label": "Bug Reports", "emoji": "🐛", "style": "blue", "category": "Bugs", "desc": "Report technical bugs or glitches."},
-            {"label": "Claims & Rewards", "emoji": "🎁", "style": "grey", "category": "Rewards", "desc": "Claim giveaways or booster rewards."},
-            {"label": "Purchase Ticket", "emoji": "🛒", "style": "green", "category": "Shop", "desc": "Inquire about store purchases or ranks."}
+        # Custom button aur text ke sath option set kiya hai
+        custom_options = [
+            {"label": button_text, "emoji": button_emoji, "style": "green", "category": "Tickets", "desc": description}
         ]
-        self.config[guild_id]["options"] = default_options
+        self.config[guild_id]["options"] = custom_options
         save_config(self.config)
 
-        # Build Embed & View
         embed = discord.Embed(title=title, description=description, color=discord.Color.blurple())
         if banner_url:
             embed.set_image(url=banner_url)
         embed.set_footer(text=f"{interaction.guild.name} • Support Center")
 
-        for opt in default_options:
-            embed.add_field(name=f"{opt['emoji']} {opt['label']}", value=opt['desc'], inline=False)
-
-        view = TicketDynamicView(default_options, staff_role.id)
+        view = TicketDynamicView(custom_options, staff_role.id)
         
         await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ Ticket panel successfully deployed with 5 default options! You can customize options using `/ticket option add/edit`.", ephemeral=True)
+        await interaction.response.send_message("✅ Ticket panel successfully deployed with your custom button text and emoji!", ephemeral=True)
 
     @ticket_group.command(name="add", description="Ticket channel me kisi user ko add karein")
     @app_commands.describe(user="Jis user ko add karna hai")
