@@ -57,11 +57,11 @@ class TicketDynamicView(discord.ui.View):
         self.staff_role_id = staff_role_id
         
         for idx, opt in enumerate(options_data):
-            label = opt.get("label", "Create Ticket")
+            label = opt.get("label", "Open")
             emoji = opt.get("emoji", "🎫")
             
             button = discord.ui.Button(
-                label=label,
+                label=f"Open ({label})",
                 emoji=emoji,
                 style=discord.ButtonStyle.green,
                 custom_id=f"ticket_opt_{idx}"
@@ -72,10 +72,11 @@ class TicketDynamicView(discord.ui.View):
     def create_callback(self, opt_info):
         async def callback(interaction: discord.Interaction):
             guild = interaction.guild
-            category = discord.utils.get(guild.categories, name="Tickets")
+            category_name = opt_info.get("category", "Tickets")
+            category = discord.utils.get(guild.categories, name=category_name)
             
             if not category:
-                category = await guild.create_category("Tickets")
+                category = await guild.create_category(category_name)
                 
             overwrites = {
                 guild.default_role: discord.PermissionOverwrite(read_messages=False),
@@ -101,8 +102,8 @@ class TicketDynamicView(discord.ui.View):
             )
             
             embed = discord.Embed(
-                title="Support Ticket",
-                description=f"Welcome {interaction.user.mention}!\nStaff jald hi aapse judege.",
+                title=f"Support: {opt_info.get('label')}",
+                description=f"Welcome {interaction.user.mention}!\n{opt_info.get('desc', 'Staff jald hi aapse judege.')}",
                 color=discord.Color.blue()
             )
             
@@ -111,15 +112,13 @@ class TicketDynamicView(discord.ui.View):
             
         return callback
 
-class TicketSetupModal(discord.ui.Modal, title="Ticket Panel Setup Menu"):
+class TicketSetupModal(discord.ui.Modal, title="Multi-Option Ticket Panel Setup"):
     def __init__(self, staff_role):
         super().__init__()
         self.staff_role = staff_role
 
-    panel_title = discord.ui.TextInput(label="Panel Title", placeholder="Support Center", default="Support Center", required=True)
-    panel_desc = discord.ui.TextInput(label="Panel Description / Guidelines", style=discord.TextStyle.paragraph, placeholder="Yahan guidelines ya description likhein...", default="Kisi bhi madad ke liye button par click karein!", required=True)
-    btn_text = discord.ui.TextInput(label="Button Text", placeholder="Create Ticket", default="Create Ticket", required=True)
-    btn_emoji = discord.ui.TextInput(label="Button Emoji", placeholder="🎫", default="🎫", required=True)
+    panel_title = discord.ui.TextInput(label="Panel Title", default="Nester X glacier Support", required=True)
+    panel_desc = discord.ui.TextInput(label="Panel Description / Guidelines", style=discord.TextStyle.paragraph, default="Choose a ticket type below. Our staff team will help you with your request.", required=True)
     banner = discord.ui.TextInput(label="Banner Image URL (Optional)", placeholder="https://...", required=False)
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -132,11 +131,16 @@ class TicketSetupModal(discord.ui.Modal, title="Ticket Panel Setup Menu"):
         config[guild_id]["title"] = self.panel_title.value
         config[guild_id]["description"] = self.panel_desc.value
         
-        options = [{
-            "label": self.btn_text.value,
-            "emoji": self.btn_emoji.value
-        }]
-        config[guild_id]["options"] = options
+        # Screenshot ki tarah 5 professional options aur buttons
+        default_options = [
+            {"label": "General Support", "emoji": "🟢", "category": "Tickets", "desc": "Get help with general questions."},
+            {"label": "Player Reports", "emoji": "❌", "category": "Reports", "desc": "Report a player for rule violations."},
+            {"label": "Bug Reports", "emoji": "🐛", "category": "Bugs", "desc": "Report bugs or glitches."},
+            {"label": "Claims & Rewards", "emoji": "🎁", "category": "Rewards", "desc": "Ask about event or booster rewards."},
+            {"label": "Purchase Ticket", "emoji": "🛒", "category": "Shop", "desc": "Request help with ranks or store purchases."}
+        ]
+        
+        config[guild_id]["options"] = default_options
         save_config(config)
 
         embed = discord.Embed(
@@ -146,19 +150,23 @@ class TicketSetupModal(discord.ui.Modal, title="Ticket Panel Setup Menu"):
         )
         if self.banner.value:
             embed.set_image(url=self.banner.value)
+        
+        for opt in default_options:
+            embed.add_field(name=f"{opt['emoji']} {opt['label']}", value=opt['desc'], inline=False)
+            
         embed.set_footer(text=f"{interaction.guild.name} • Support Center")
 
-        view = TicketDynamicView(options, self.staff_role.id)
+        view = TicketDynamicView(default_options, self.staff_role.id)
         await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ Ticket panel successfully deploy ho gaya!", ephemeral=True)
+        await interaction.response.send_message("✅ Multi-button ticket panel successfully deploy ho gaya!", ephemeral=True)
 
 class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="ticketsetup", description="Menu kholkar ticket panel setup karein")
+    @app_commands.command(name="ticketsetup", description="Screenshot jaisa multi-button ticket panel setup karein")
     @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(staff_role="Staff Role jise ticket ka access milega")
+    @app_commands.describe(staff_role="Staff Role jise ticket access milega")
     async def ticketsetup(self, interaction: discord.Interaction, staff_role: discord.Role):
         await interaction.response.send_modal(TicketSetupModal(staff_role))
 
