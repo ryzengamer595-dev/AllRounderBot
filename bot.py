@@ -67,6 +67,15 @@ async def load_extensions():
         except Exception as e:
             print(f"Failed to load extension {cog}: {e}")
 
+    # Persistent views ko register karna taaki buttons hamesha active rahein
+    from cogs.tickets import TicketControlView, TicketDynamicView, load_config
+    config = load_config()
+    bot.add_view(TicketControlView())
+    for guild_id, data in config.items():
+        if "options" in data and "staff_role_id" in data:
+            bot.add_view(TicketDynamicView(data["options"], data["staff_role_id"]))
+    print("✅ Persistent Ticket Views Registered.")
+
 async def main():
     async with bot:
         await load_extensions()
