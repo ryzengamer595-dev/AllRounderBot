@@ -1,6 +1,5 @@
 import os
-import traceback
-
+import asyncio
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -8,119 +7,91 @@ from dotenv import load_dotenv
 load_dotenv()
 
 TOKEN = os.getenv("DISCORD_TOKEN")
-
-if not TOKEN:
-    raise RuntimeError("DISCORD_TOKEN environment variable is missing!")
-
+PREFIX = "!"
 
 intents = discord.Intents.default()
-intents.members = True
 intents.message_content = True
+intents.members = True
 intents.presences = True
+intents.guilds = True
 
+bot = commands.Bot(
+    command_prefix=PREFIX,
+    intents=intents,
+    help_command=None
+)
 
-class AllRounderBot(commands.Bot):
+@bot.event
+async def on_ready():
+    print("=" * 45)
+    print(f"Bot Name : {bot.user}")
+    print(f"Bot ID   : {bot.user.id}")
+    print(f"Servers  : {len(bot.guilds)}")
+    print("Status   : ONLINE")
+    print("=" * 45)
 
-    def __init__(self):
-        super().__init__(
-            command_prefix="!",
-            intents=intents,
-            help_command=None
-        )
-
-    async def setup_hook(self):
-
-        extensions = [
-            "cogs.moderation",
-            "cogs.utility",
-            "cogs.fun",
-            "cogs.server",
-            "cogs.welcome",
-            "cogs.tickets",
-            "cogs.economy",
-            "cogs.automod",
-        ]
-
-        print("\n" + "=" * 60)
-        print("       ALLROUNDER BOT - LOADING EXTENSIONS")
-        print("=" * 60)
-
-        for extension in extensions:
-            try:
-                await self.load_extension(extension)
-                print(f"✅ Loaded: {extension}")
-
-            except Exception as error:
-                print(f"❌ Failed: {extension}")
-                print(f"   {error}")
-                traceback.print_exc()
-
-        print("=" * 60)
-        print("       SYNCING SLASH COMMANDS")
-        print("=" * 60)
-
-        # Global sync
+    # Server-wise instant sync taaki commands turant dikhein
+    for guild in bot.guilds:
         try:
-            global_commands = await self.tree.sync()
+            bot.tree.copy_global_to(guild=guild)
+            synced = await bot.tree.sync(guild=guild)
+            print(f"✅ Instantly synced {len(synced)} commands to guild: {guild.name}")
+        except Exception as e:
+            print(f"⚠️ Failed to sync to guild {guild.name}: {e}")
 
-            print(
-                f"🌍 Global commands synced: "
-                f"{len(global_commands)}"
-            )
+    try:
+        global_synced = await bot.tree.sync()
+        print(f"🌐 Globally synced {len(global_synced)} Slash Commands.")
+    except Exception as e:
+        print(f"⚠️ Global sync error: {e}")
 
-        except Exception as error:
-            print("❌ Global sync failed:")
-            print(error)
+    activity = discord.Game(name="Managing Server | /help")
+    await bot.change_presence(status=discord.Status.online, activity=activity)
 
-        # Guild sync
-        #
-        # This makes slash commands appear much faster
-        # in servers where the bot is already installed.
-        #
-        for guild in self.guilds:
+async def load_extensions():
+    cogs = [
+        "cogs.economy",
+        "cogs.automod",
+        "cogs.moderation",
+        "cogs.utility",
+        "cogs.fun",
+        "cogs.server",
+        "cogs.welcome",
+        "cogs.tickets",
+        "cogs.announcement"
+    ]
+    for cog in cogs:
+        try:
+            await bot.load_extension(cog)
+            print(f"Loaded extension: {cog}")
+        except Exception as e:
+            print(f"Failed to load extension {cog}: {e}")
+
+async def main():
+    async with bot:
+        await load_extensions()
+        if not TOKEN or TOKEN == "your_bot_token_here":
+            print("⚠️ WARNING: Please set DISCORD_TOKEN in .env file!")
+            return
+            
+        while True:
             try:
-                guild_commands = await self.tree.sync(
-                    guild=guild
-                )
+                print("Connecting to Discord...")
+                await bot.start(TOKEN)
+                break
+            except discord.errors.HTTPException as e:
+                if e.status == 429:
+                    print("⚠️ Hit Cloudflare Rate Limit (429/1015). Waiting 60 seconds...")
+                    await asyncio.sleep(60)
+                else:
+                    print(f"HTTP Exception: {e}")
+                    await asyncio.sleep(10)
+            except Exception as e:
+                print(f"Connection error: {e}. Retrying in 15 seconds...")
+                await asyncio.sleep(15)
 
-                print(
-                    f"✅ Guild synced: "
-                    f"{guild.name} "
-                    f"({guild.id}) "
-                    f"→ {len(guild_commands)} commands"
-                )
-
-            except Exception as error:
-                print(
-                    f"❌ Guild sync failed: "
-                    f"{guild.name}"
-                )
-                print(error)
-
-        print("=" * 60)
-
-
-    async def on_ready(self):
-
-        print("\n" + "=" * 60)
-        print(f"🤖 Logged in as: {self.user}")
-        print(f"🆔 Bot ID: {self.user.id}")
-        print(f"🌐 Servers: {len(self.guilds)}")
-        print("=" * 60)
-
-        for guild in self.guilds:
-            print(
-                f"📌 {guild.name} "
-                f"({guild.id})"
-            )
-
-        await self.change_presence(
-            activity=discord.Game(
-                name="/help • All-Rounder Bot"
-            )
-        )
-
-
-bot = AllRounderBot()
-
-bot.run(TOKEN)
+if __name__ == "__main__":
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Bot stopped manually.")
