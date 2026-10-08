@@ -112,13 +112,13 @@ class TicketDynamicView(discord.ui.View):
             
         return callback
 
-class TicketSetupModal(discord.ui.Modal, title="Multi-Option Ticket Panel Setup"):
+class TicketSetupModal(discord.ui.Modal, title="Custom Ticket Panel Setup"):
     def __init__(self, staff_role):
         super().__init__()
         self.staff_role = staff_role
 
-    panel_title = discord.ui.TextInput(label="Panel Title", default="Nester X glacier Support", required=True)
-    panel_desc = discord.ui.TextInput(label="Panel Description / Guidelines", style=discord.TextStyle.paragraph, default="Choose a ticket type below. Our staff team will help you with your request.", required=True)
+    panel_title = discord.ui.TextInput(label="Panel Title", default="Support Center", required=True)
+    panel_desc = discord.ui.TextInput(label="Panel Description / Guidelines", style=discord.TextStyle.paragraph, default="Choose a ticket type below. Our staff team will help you.", required=True)
     banner = discord.ui.TextInput(label="Banner Image URL (Optional)", placeholder="https://...", required=False)
 
     async def on_submit(self, interaction: discord.Interaction):
@@ -131,16 +131,15 @@ class TicketSetupModal(discord.ui.Modal, title="Multi-Option Ticket Panel Setup"
         config[guild_id]["title"] = self.panel_title.value
         config[guild_id]["description"] = self.panel_desc.value
         
-        # Screenshot ki tarah 5 professional options aur buttons
-        default_options = [
+        # Multiple professional options jaisa screenshot me hota hai
+        custom_options = [
             {"label": "General Support", "emoji": "🟢", "category": "Tickets", "desc": "Get help with general questions."},
             {"label": "Player Reports", "emoji": "❌", "category": "Reports", "desc": "Report a player for rule violations."},
             {"label": "Bug Reports", "emoji": "🐛", "category": "Bugs", "desc": "Report bugs or glitches."},
-            {"label": "Claims & Rewards", "emoji": "🎁", "category": "Rewards", "desc": "Ask about event or booster rewards."},
             {"label": "Purchase Ticket", "emoji": "🛒", "category": "Shop", "desc": "Request help with ranks or store purchases."}
         ]
         
-        config[guild_id]["options"] = default_options
+        config[guild_id]["options"] = custom_options
         save_config(config)
 
         embed = discord.Embed(
@@ -151,20 +150,20 @@ class TicketSetupModal(discord.ui.Modal, title="Multi-Option Ticket Panel Setup"
         if self.banner.value:
             embed.set_image(url=self.banner.value)
         
-        for opt in default_options:
+        for opt in custom_options:
             embed.add_field(name=f"{opt['emoji']} {opt['label']}", value=opt['desc'], inline=False)
             
         embed.set_footer(text=f"{interaction.guild.name} • Support Center")
 
-        view = TicketDynamicView(default_options, self.staff_role.id)
+        view = TicketDynamicView(custom_options, self.staff_role.id)
         await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ Multi-button ticket panel successfully deploy ho gaya!", ephemeral=True)
+        await interaction.response.send_message("✅ Ticket panel successfully deploy ho gaya!", ephemeral=True)
 
 class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="ticketsetup", description="Screenshot jaisa multi-button ticket panel setup karein")
+    @app_commands.command(name="ticketsetup", description="Custom ticket panel setup karein")
     @app_commands.default_permissions(administrator=True)
     @app_commands.describe(staff_role="Staff Role jise ticket access milega")
     async def ticketsetup(self, interaction: discord.Interaction, staff_role: discord.Role):
@@ -181,7 +180,7 @@ class Tickets(commands.Cog):
 
     @app_commands.command(name="ticketremove", description="Ticket se user remove karein")
     @app_commands.describe(user="Jis user ko remove karna hai")
-    async def ticket_remove(self, interaction: discord.Interaction, user: discord.Member):
+    async def ticket_remove(self, interaction: discord.Interaction, user: discord.MessageCreate | discord.Member):
         if not interaction.channel.name.startswith("ticket-"):
             await interaction.response.send_message("❌ Ye command sirf ticket channels me kaam karegi!", ephemeral=True)
             return
