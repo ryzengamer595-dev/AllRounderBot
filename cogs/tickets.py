@@ -25,7 +25,7 @@ class TicketControlView(discord.ui.View):
         super().__init__(timeout=None)
         self.staff_role_id = staff_role_id
 
-    @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary, emoji="🙋‍♂️", custom_id="claim_ticket_btn_final")
+    @discord.ui.button(label="Claim", style=discord.ButtonStyle.primary, emoji="🙋‍♂️", custom_id="claim_ticket_ultimate")
     async def claim_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         if self.staff_role_id and not any(role.id == self.staff_role_id for role in interaction.user.roles):
             if not interaction.user.guild_permissions.administrator:
@@ -42,7 +42,7 @@ class TicketControlView(discord.ui.View):
         await interaction.message.edit(embed=embed, view=self)
         await interaction.response.send_message(f"✅ Ticket claimed by {interaction.user.mention}!", ephemeral=False)
 
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_btn_final")
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.danger, emoji="🔒", custom_id="close_ticket_ultimate")
     async def close_ticket(self, interaction: discord.Interaction, button: discord.ui.Button):
         await interaction.response.send_message("🔒 Ticket 5 seconds me delete ho raha hai...", ephemeral=False)
         await asyncio.sleep(5)
@@ -70,7 +70,7 @@ class TicketDynamicView(discord.ui.View):
                 label=f"Open ({label})",
                 emoji=emoji,
                 style=style,
-                custom_id=f"ticket_opt_final_{idx}"
+                custom_id=f"ticket_custom_btn_{idx}"
             )
             button.callback = self.create_callback(opt)
             self.add_item(button)
@@ -118,65 +118,104 @@ class TicketDynamicView(discord.ui.View):
             
         return callback
 
-class TicketSetupModal(discord.ui.Modal, title="Ticket Panel Setup"):
-    def __init__(self, staff_role):
-        super().__init__()
-        self.staff_role = staff_role
-
-    panel_title = discord.ui.TextInput(label="Panel Title", default="TEAM Vsus Support", required=True)
-    panel_desc = discord.ui.TextInput(label="Panel Description / Guidelines", style=discord.TextStyle.paragraph, default="Choose a ticket type below. Our staff team will help you with your request.", required=True)
-    banner = discord.ui.TextInput(label="Banner Image URL (Optional)", placeholder="https://...", required=False)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        guild_id = str(interaction.guild.id)
-        config = load_config()
-        if guild_id not in config:
-            config[guild_id] = {}
-
-        config[guild_id]["staff_role_id"] = self.staff_role.id
-        config[guild_id]["title"] = self.panel_title.value
-        config[guild_id]["description"] = self.panel_desc.value
-        
-        # Max 5 professional options jo screenshot ke hisab se hain
-        default_options = [
-            {"label": "General Support", "emoji": "🟢", "style": "green", "category": "Tickets", "desc": "Get help with general questions."},
-            {"label": "Player Reports", "emoji": "❌", "style": "red", "category": "Reports", "desc": "Report a player for rule violations."},
-            {"label": "Bug Reports", "emoji": "🐛", "style": "blue", "category": "Bugs", "desc": "Report bugs or glitches."},
-            {"label": "Claims & Rewards", "emoji": "🎁", "style": "grey", "category": "Rewards", "desc": "Ask about event or booster rewards."},
-            {"label": "Purchase Ticket", "emoji": "🛒", "style": "green", "category": "Shop", "desc": "Request help with ranks or store purchases."}
-        ]
-        
-        config[guild_id]["options"] = default_options
-        save_config(config)
-
-        embed = discord.Embed(
-            title=self.panel_title.value,
-            description=self.panel_desc.value,
-            color=discord.Color.blurple()
-        )
-        if self.banner.value:
-            embed.set_image(url=self.banner.value)
-        
-        for opt in default_options:
-            embed.add_field(name=f"{opt['emoji']} {opt['label']}", value=opt['desc'], inline=False)
-            
-        embed.set_footer(text=f"{interaction.guild.name} • Support Center")
-
-        view = TicketDynamicView(default_options, self.staff_role.id)
-        await interaction.channel.send(embed=embed, view=view)
-        await interaction.response.send_message("✅ Ticket panel successfully deploy ho gaya!", ephemeral=True)
-
 class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
+        self.config = load_config()
 
-    @app_commands.command(name="ticketsetup", description="Modal kholkar custom ticket panel setup karein")
+    ticket_group = app_commands.Group(name="ticket", description="Advanced Ticket System")
+
+    @ticket_group.command(name="setup", description="Panel ka Title, Description aur Staff Role set karein")
     @app_commands.default_permissions(administrator=True)
-    @app_commands.describe(staff_role="Staff Role jise ticket ka access milega")
-    async def ticketsetup(self, interaction: discord.Interaction, staff_role: discord.Role):
-        await interaction.response.send_modal(TicketSetupModal(staff_role))
+    @app_commands.describe(title="Panel Title", description="Panel Description/Guidelines", staff_role="Staff Role")
+    async def ticket_setup(self, interaction: discord.Interaction, title: str, description: str, staff_role: discord.Role):
+        guild_id = str(interaction.guild.id)
+        if guild_id not in self.config:
+            self.config[guild_id] = {}
 
-    @app_commands.command(name="ticketadd", description="Ticket me user add karein")
+        self.config[guild_id]["title"] = title
+        self.config[guild_id]["description"] = description
+        self.config[guild_id]["staff_role_id"] = staff_role.id
+        if "options" not in self.config[guild_id]:
+            self.config[guild_id]["options"] = []
+            
+        save_config(self.config)
+        await interaction.response.send_message(f"✅ Ticket setup saved!\n**Title:** {title}\n**Staff:** {staff_role.mention}\nAb `/ticket addbutton` se buttons add karein.", ephemeral=True)
+
+    @ticket_group.command(name="addbutton", description="Panel me naya button add karein (Max 5)")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(
+        name="Button Name (e.g. General Support)",
+        description="Embed field ke liye description",
+        emoji="Button Emoji (e.g. 🟢)",
+        style="Color: green, red, blue, grey"
+    )
+    @app_commands.choices(style=[
+        app_commands.Choice(name="Green", value="green"),
+        app_commands.Choice(name="Red", value="red"),
+        app_commands.Choice(name="Blue", value="blue"),
+        app_commands.Choice(name="Grey", value="grey")
+    ])
+    async def ticket_addbutton(self, interaction: discord.Interaction, name: str, description: str, emoji: str, style: str = "green"):
+        guild_id = str(interaction.guild.id)
+        if guild_id not in self.config:
+            self.config[guild_id] = {"options": []}
+
+        if "options" not in self.config[guild_id]:
+            self.config[guild_id]["options"] = []
+
+        if len(self.config[guild_id]["options"]) >= 5:
+            await interaction.response.send_message("❌ Aap maximum 5 hi buttons add kar sakte hain!", ephemeral=True)
+            return
+
+        self.config[guild_id]["options"].append({
+            "label": name,
+            "desc": description,
+            "emoji": emoji,
+            "style": style,
+            "category": "Tickets"
+        })
+        save_config(self.config)
+        await interaction.response.send_message(f"✅ Button **{name}** add ho gaya! (Total: {len(self.config[guild_id]['options'])}/5)", ephemeral=True)
+
+    @ticket_group.command(name="clearbuttons", description="Saare buttons clear kar dein")
+    @app_commands.default_permissions(administrator=True)
+    async def ticket_clearbuttons(self, interaction: discord.Interaction):
+        guild_id = str(interaction.guild.id)
+        if guild_id in self.config:
+            self.config[guild_id]["options"] = []
+            save_config(self.config)
+        await interaction.response.send_message("🗑️ Saare buttons delete kar diye gaye hain.", ephemeral=True)
+
+    @ticket_group.command(name="panel", description="Customize kiya hua final ticket panel channel me bhejein")
+    @app_commands.default_permissions(administrator=True)
+    @app_commands.describe(banner_url="Optional Banner Image URL")
+    async def ticket_panel(self, interaction: discord.Interaction, banner_url: str = None):
+        guild_id = str(interaction.guild.id)
+        data = self.config.get(guild_id)
+
+        if not data or not data.get("options") or not data.get("staff_role_id"):
+            await interaction.response.send_message("❌ Pehle `/ticket setup` aur kam se kam ek `/ticket addbutton` configure karein!", ephemeral=True)
+            return
+
+        embed = discord.Embed(
+            title=data.get("title", "Support Center"),
+            description=data.get("description", "Please select an option below."),
+            color=discord.Color.blurple()
+        )
+        if banner_url:
+            embed.set_image(url=banner_url)
+
+        for opt in data["options"]:
+            embed.add_field(name=f"{opt['emoji']} {opt['label']}", value=opt['desc'], inline=False)
+
+        embed.set_footer(text=f"{interaction.guild.name} • Support Center")
+
+        view = TicketDynamicView(data["options"], data["staff_role_id"])
+        await interaction.channel.send(embed=embed, view=view)
+        await interaction.response.send_message("✅ Ticket panel successfully deploy ho gaya!", ephemeral=True)
+
+    @ticket_group.command(name="add", description="Ticket me user add karein")
     @app_commands.describe(user="Jis user ko add karna hai")
     async def ticket_add(self, interaction: discord.Interaction, user: discord.Member):
         if not interaction.channel.name.startswith("ticket-"):
@@ -185,7 +224,7 @@ class Tickets(commands.Cog):
         await interaction.channel.set_permissions(user, read_messages=True, send_messages=True)
         await interaction.response.send_message(f"✅ Successfully added {user.mention} to this ticket.")
 
-    @app_commands.command(name="ticketremove", description="Ticket se user remove karein")
+    @ticket_group.command(name="remove", description="Ticket se user remove karein")
     @app_commands.describe(user="Jis user ko remove karna hai")
     async def ticket_remove(self, interaction: discord.Interaction, user: discord.Member):
         if not interaction.channel.name.startswith("ticket-"):
