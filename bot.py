@@ -27,16 +27,8 @@ async def on_ready():
     print(f"Bot Name : {bot.user}")
     print(f"Bot ID   : {bot.user.id}")
     print(f"Servers  : {len(bot.guilds)}")
-    print("Status   : ONLINE (Music-Free & All-Rounder)")
+    print("Status   : ONLINE")
     print("=" * 45)
-
-    for guild in bot.guilds:
-        try:
-            bot.tree.copy_global_to(guild=guild)
-            synced = await bot.tree.sync(guild=guild)
-            print(f"✅ Synced {len(synced)} commands to guild: {guild.name}")
-        except Exception as e:
-            print(f"⚠️ Failed to sync to guild {guild.name}: {e}")
 
     try:
         global_synced = await bot.tree.sync()

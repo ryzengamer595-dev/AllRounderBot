@@ -55,12 +55,13 @@ class Tickets(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @app_commands.command(name="ticketsetup", description="Ticket panel send karo channel me")
+    @app_commands.command(name="ticketsetup", description="Custom title aur description ke sath ticket panel setup karein")
     @app_commands.default_permissions(administrator=True)
-    async def ticketsetup(self, interaction: discord.Interaction):
+    @app_commands.describe(title="Ticket Embed ka Title", description="Ticket Embed ka Description/Message")
+    async def ticketsetup(self, interaction: discord.Interaction, title: str = "Support Center", description: str = "Kisi bhi madad ya query ke liye neeche diye gaye button par click karke ticket open karein!"):
         embed = discord.Embed(
-            title="Support Center",
-            description="Kisi bhi madad ya query ke liye neeche diye gaye button par click karke ticket open karein!",
+            title=title,
+            description=description,
             color=discord.Color.green()
         )
         await interaction.channel.send(embed=embed, view=TicketView())
