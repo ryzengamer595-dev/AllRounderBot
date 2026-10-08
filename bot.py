@@ -42,7 +42,7 @@ class AllRounderBot(commands.Bot):
         ]
 
         print("\n" + "=" * 60)
-        print("           ALLROUNDER BOT - LOADING COGS")
+        print("       ALLROUNDER BOT - LOADING EXTENSIONS")
         print("=" * 60)
 
         for extension in extensions:
@@ -51,45 +51,68 @@ class AllRounderBot(commands.Bot):
                 print(f"✅ Loaded: {extension}")
 
             except Exception as error:
-                print(f"❌ FAILED: {extension}")
-                print(f"   Error: {error}")
+                print(f"❌ Failed: {extension}")
+                print(f"   {error}")
                 traceback.print_exc()
 
         print("=" * 60)
-        print("              SYNCING SLASH COMMANDS")
+        print("       SYNCING SLASH COMMANDS")
         print("=" * 60)
 
+        # Global sync
         try:
-            synced = await self.tree.sync()
+            global_commands = await self.tree.sync()
 
-            print(f"✅ Synced {len(synced)} slash command(s).")
-
-            for command in synced:
-                print(f"   /{command.name}")
+            print(
+                f"🌍 Global commands synced: "
+                f"{len(global_commands)}"
+            )
 
         except Exception as error:
-            print("❌ Slash command sync failed!")
-            print(f"Error: {error}")
-            traceback.print_exc()
+            print("❌ Global sync failed:")
+            print(error)
+
+        # Guild sync
+        #
+        # This makes slash commands appear much faster
+        # in servers where the bot is already installed.
+        #
+        for guild in self.guilds:
+            try:
+                guild_commands = await self.tree.sync(
+                    guild=guild
+                )
+
+                print(
+                    f"✅ Guild synced: "
+                    f"{guild.name} "
+                    f"({guild.id}) "
+                    f"→ {len(guild_commands)} commands"
+                )
+
+            except Exception as error:
+                print(
+                    f"❌ Guild sync failed: "
+                    f"{guild.name}"
+                )
+                print(error)
 
         print("=" * 60)
-        print()
 
 
     async def on_ready(self):
 
-        print("=" * 60)
+        print("\n" + "=" * 60)
         print(f"🤖 Logged in as: {self.user}")
         print(f"🆔 Bot ID: {self.user.id}")
         print(f"🌐 Servers: {len(self.guilds)}")
-
-        if self.guilds:
-            print("📋 Connected servers:")
-
-            for guild in self.guilds:
-                print(f"   • {guild.name} ({guild.id})")
-
         print("=" * 60)
+
+        for guild in self.guilds:
+            print(
+                f"📌 {guild.name} "
+                f"({guild.id})"
+            )
 
         await self.change_presence(
             activity=discord.Game(
