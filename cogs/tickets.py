@@ -1,12 +1,14 @@
 import discord
 from discord import app_commands
 from discord.ext import commands
+
 import json
 import os
 from datetime import datetime
 
 
 CONFIG_FILE = "ticket_config.json"
+
 
 DEFAULT_CONFIG = {
     "title": "🎫 Support Tickets",
@@ -32,6 +34,7 @@ def load_config():
 
         config = DEFAULT_CONFIG.copy()
         config.update(data)
+
         return config
 
     except Exception:
@@ -84,9 +87,7 @@ def is_ticket_channel(channel):
     return (
         isinstance(channel, discord.TextChannel)
         and channel.topic is not None
-        and channel.topic.startswith(
-            "allrounder-ticket:"
-        )
+        and channel.topic.startswith("allrounder-ticket:")
     )
 
 
@@ -105,6 +106,24 @@ def make_prefix(text):
     return prefix[:20]
 
 
+def is_staff(interaction):
+    guild = interaction.guild
+
+    if guild is None:
+        return False
+
+    config = load_config()
+    staff_role = get_staff_role(guild, config)
+
+    if interaction.user.guild_permissions.manage_channels:
+        return True
+
+    if staff_role and staff_role in interaction.user.roles:
+        return True
+
+    return False
+
+
 # ============================================================
 # PANEL EMBED
 # ============================================================
@@ -120,7 +139,7 @@ def create_panel_embed(config):
             "description",
             "Select an option below."
         ),
-        color=0x5865F2
+        color=discord.Color.blurple()
     )
 
     banner = config.get("banner", "")
@@ -150,6 +169,7 @@ class TicketView(discord.ui.View):
         options = config.get("options", [])
 
         for index, option in enumerate(options):
+
             self.add_item(
                 TicketButton(
                     option,
@@ -162,15 +182,20 @@ class TicketButton(discord.ui.Button):
 
     def __init__(self, option, index):
 
+        emoji = option.get(
+            "emoji",
+            "🎫"
+        )
+
+        if not emoji:
+            emoji = "🎫"
+
         super().__init__(
             label=option.get(
                 "name",
                 "Ticket"
             )[:80],
-            emoji=option.get(
-                "emoji",
-                "🎫"
-            ),
+            emoji=emoji[:10],
             style=discord.ButtonStyle.primary,
             custom_id=(
                 "allrounder:ticket:"
@@ -185,6 +210,10 @@ class TicketButton(discord.ui.Button):
         guild = interaction.guild
 
         if guild is None:
+            await interaction.response.send_message(
+                "❌ This button can only be used inside a server.",
+                ephemeral=True
+            )
             return
 
         config = load_config()
@@ -209,13 +238,11 @@ class TicketButton(discord.ui.Button):
         )
 
         if existing:
-
             await interaction.response.send_message(
                 "❌ You already have a ticket: "
                 + existing.mention,
                 ephemeral=True
             )
-
             return
 
         # ----------------------------------------------------
@@ -230,22 +257,19 @@ class TicketButton(discord.ui.Button):
         if category is None:
 
             try:
-
                 category = await guild.create_category(
                     config.get(
                         "category_name",
                         "Tickets"
                     ),
-                    reason="Ticket system category"
+                    reason="AllRounderBot ticket category"
                 )
 
             except discord.Forbidden:
-
                 await interaction.response.send_message(
                     "❌ I don't have permission to create the ticket category.",
                     ephemeral=True
                 )
-
                 return
 
         # ----------------------------------------------------
@@ -261,43 +285,40 @@ class TicketButton(discord.ui.Button):
         # PERMISSIONS
         # ----------------------------------------------------
 
+        bot_member = guild.me
+
         overwrites = {
+            guild.default_role: discord.PermissionOverwrite(
+                view_channel=False
+            ),
 
-            guild.default_role:
-                discord.PermissionOverwrite(
-                    view_channel=False
-                ),
-
-            interaction.user:
-                discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    attach_files=True,
-                    embed_links=True
-                ),
-
-            guild.me:
-                discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    manage_channels=True,
-                    manage_messages=True,
-                    read_message_history=True
-                )
+            interaction.user: discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+                embed_links=True
+            )
         }
 
-        if staff_role:
+        if bot_member:
+            overwrites[bot_member] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                manage_channels=True,
+                manage_messages=True,
+                attach_files=True,
+                embed_links=True
+            )
 
-            overwrites[staff_role] = (
-                discord.PermissionOverwrite(
-                    view_channel=True,
-                    send_messages=True,
-                    read_message_history=True,
-                    attach_files=True,
-                    embed_links=True
-                )
+        if staff_role:
+            overwrites[staff_role] = discord.PermissionOverwrite(
+                view_channel=True,
+                send_messages=True,
+                read_message_history=True,
+                attach_files=True,
+                embed_links=True
             )
 
         # ----------------------------------------------------
@@ -354,38 +375,52 @@ class TicketButton(discord.ui.Button):
                 "❌ I don't have permission to create ticket channels.",
                 ephemeral=True
             )
+            return
 
+        except discord.HTTPException as error:
+
+            await interaction.response.send_message(
+                "❌ Discord rejected the ticket channel creation.\n"
+                + str(error),
+                ephemeral=True
+            )
             return
 
         # ----------------------------------------------------
         # TICKET EMBED
         # ----------------------------------------------------
 
+        option_emoji = self.option.get(
+            "emoji",
+            "🎫"
+        )
+
+        option_name = self.option.get(
+            "name",
+            "Ticket"
+        )
+
+        option_description = self.option.get(
+            "description",
+            "Please explain your issue."
+        )
+
         embed = discord.Embed(
             title=(
-                self.option.get(
-                    "emoji",
-                    "🎫"
-                )
+                option_emoji
                 + " "
-                + self.option.get(
-                    "name",
-                    "Ticket"
-                )
+                + option_name
             ),
             description=(
                 "Welcome "
                 + interaction.user.mention
                 + "! 👋\n\n"
-                + self.option.get(
-                    "description",
-                    "Please explain your issue."
-                )
+                + option_description
                 + "\n\n"
                 + "Please explain your issue clearly.\n"
                 + "A staff member will assist you shortly."
             ),
-            color=0x5865F2,
+            color=discord.Color.blurple(),
             timestamp=datetime.utcnow()
         )
 
@@ -398,11 +433,21 @@ class TicketButton(discord.ui.Button):
         if staff_role:
             content += " " + staff_role.mention
 
-        await channel.send(
-            content=content,
-            embed=embed,
-            view=TicketControlView()
-        )
+        try:
+
+            await channel.send(
+                content=content,
+                embed=embed,
+                view=TicketControlView()
+            )
+
+        except discord.Forbidden:
+
+            await interaction.response.send_message(
+                "⚠️ Ticket channel was created, but I couldn't send the ticket message.",
+                ephemeral=True
+            )
+            return
 
         await interaction.response.send_message(
             "✅ Ticket created: "
@@ -432,28 +477,16 @@ class TicketControlView(discord.ui.View):
     )
     async def claim(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
-        config = load_config()
-
-        staff_role = get_staff_role(
-            interaction.guild,
-            config
-        )
-
-        if (
-            staff_role
-            and staff_role not in interaction.user.roles
-            and not interaction.user.guild_permissions.manage_channels
-        ):
+        if not is_staff(interaction):
 
             await interaction.response.send_message(
                 "❌ Only staff members can claim tickets.",
                 ephemeral=True
             )
-
             return
 
         embed = discord.Embed(
@@ -463,7 +496,7 @@ class TicketControlView(discord.ui.View):
                 + interaction.user.mention
                 + "."
             ),
-            color=0x57F287
+            color=discord.Color.green()
         )
 
         await interaction.response.send_message(
@@ -482,28 +515,16 @@ class TicketControlView(discord.ui.View):
     )
     async def close(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
-        config = load_config()
-
-        staff_role = get_staff_role(
-            interaction.guild,
-            config
-        )
-
-        if (
-            staff_role
-            and staff_role not in interaction.user.roles
-            and not interaction.user.guild_permissions.manage_channels
-        ):
+        if not is_staff(interaction):
 
             await interaction.response.send_message(
                 "❌ Only staff can close tickets.",
                 ephemeral=True
             )
-
             return
 
         await interaction.response.send_message(
@@ -523,12 +544,12 @@ class TicketControlView(discord.ui.View):
     )
     async def add_user(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
         await interaction.response.send_message(
-            "Use /ticketadd @user to add a member.",
+            "Use `/ticketadd @user` to add a member.",
             ephemeral=True
         )
 
@@ -544,12 +565,12 @@ class TicketControlView(discord.ui.View):
     )
     async def remove_user(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
         await interaction.response.send_message(
-            "Use /ticketremove @user to remove a member.",
+            "Use `/ticketremove @user` to remove a member.",
             ephemeral=True
         )
 
@@ -571,28 +592,16 @@ class DeleteTicketView(discord.ui.View):
     )
     async def delete(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
-        config = load_config()
-
-        staff_role = get_staff_role(
-            interaction.guild,
-            config
-        )
-
-        if (
-            staff_role
-            and staff_role not in interaction.user.roles
-            and not interaction.user.guild_permissions.manage_channels
-        ):
+        if not is_staff(interaction):
 
             await interaction.response.send_message(
                 "❌ Only staff can delete tickets.",
                 ephemeral=True
             )
-
             return
 
         await interaction.response.send_message(
@@ -648,7 +657,10 @@ class BasicSetupModal(discord.ui.Modal):
         self.add_item(self.panel_description)
         self.add_item(self.category_name)
 
-    async def on_submit(self, interaction):
+    async def on_submit(
+        self,
+        interaction: discord.Interaction
+    ):
 
         session = setup_sessions.get(
             self.user_id
@@ -657,10 +669,9 @@ class BasicSetupModal(discord.ui.Modal):
         if session is None:
 
             await interaction.response.send_message(
-                "❌ Setup expired. Run /ticket setup again.",
+                "❌ Setup expired. Run `/ticket setup` again.",
                 ephemeral=True
             )
-
             return
 
         session["title"] = str(
@@ -707,8 +718,8 @@ class StaffRoleView(discord.ui.View):
     )
     async def role_select(
         self,
-        interaction,
-        select
+        interaction: discord.Interaction,
+        select: discord.ui.RoleSelect
     ):
 
         session = setup_sessions.get(
@@ -721,7 +732,6 @@ class StaffRoleView(discord.ui.View):
                 "❌ Setup expired.",
                 ephemeral=True
             )
-
             return
 
         role = select.values[0]
@@ -740,7 +750,7 @@ class StaffRoleView(discord.ui.View):
 
 
 # ============================================================
-# BANNER
+# BANNER CHOICE
 # ============================================================
 
 class BannerChoiceView(discord.ui.View):
@@ -760,8 +770,8 @@ class BannerChoiceView(discord.ui.View):
     )
     async def add_banner(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
         await interaction.response.send_modal(
@@ -777,8 +787,8 @@ class BannerChoiceView(discord.ui.View):
     )
     async def no_banner(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
         session = setup_sessions.get(
@@ -820,7 +830,10 @@ class BannerModal(discord.ui.Modal):
             self.banner_url
         )
 
-    async def on_submit(self, interaction):
+    async def on_submit(
+        self,
+        interaction: discord.Interaction
+    ):
 
         session = setup_sessions.get(
             self.user_id
@@ -890,8 +903,8 @@ class OptionCountView(discord.ui.View):
     )
     async def count_select(
         self,
-        interaction,
-        select
+        interaction: discord.Interaction,
+        select: discord.ui.Select
     ):
 
         count = int(
@@ -950,8 +963,8 @@ class NextOptionView(discord.ui.View):
     )
     async def setup_option(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
         await interaction.response.send_modal(
@@ -1020,7 +1033,10 @@ class OptionModal(discord.ui.Modal):
             self.option_description
         )
 
-    async def on_submit(self, interaction):
+    async def on_submit(
+        self,
+        interaction: discord.Interaction
+    ):
 
         session = setup_sessions.get(
             self.user_id
@@ -1032,7 +1048,6 @@ class OptionModal(discord.ui.Modal):
                 "❌ Setup expired.",
                 ephemeral=True
             )
-
             return
 
         options = session.setdefault(
@@ -1059,13 +1074,15 @@ class OptionModal(discord.ui.Modal):
             }
         )
 
-        if len(options) < self.total:
+        current_number = len(options)
 
-            next_number = len(options) + 1
+        if current_number < self.total:
+
+            next_number = current_number + 1
 
             await interaction.response.send_message(
                 "✅ Option "
-                + str(len(options))
+                + str(current_number)
                 + " saved.\n\n"
                 "Now setup option "
                 + str(next_number)
@@ -1110,8 +1127,8 @@ class SetupPreviewView(discord.ui.View):
     )
     async def preview(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
         session = setup_sessions.get(
@@ -1139,8 +1156,8 @@ class SetupPreviewView(discord.ui.View):
     )
     async def confirm(
         self,
-        interaction,
-        button
+        interaction: discord.Interaction,
+        button: discord.ui.Button
     ):
 
         session = setup_sessions.get(
@@ -1150,10 +1167,9 @@ class SetupPreviewView(discord.ui.View):
         if session is None:
 
             await interaction.response.send_message(
-                "❌ Setup expired. Run /ticket setup again.",
+                "❌ Setup expired. Run `/ticket setup` again.",
                 ephemeral=True
             )
-
             return
 
         config = load_config()
@@ -1183,7 +1199,6 @@ class SetupPreviewView(discord.ui.View):
                 "❌ I cannot send the ticket panel here.",
                 ephemeral=True
             )
-
             return
 
         setup_sessions.pop(
@@ -1200,33 +1215,185 @@ class SetupPreviewView(discord.ui.View):
 
 
 # ============================================================
-# TICKET COG
+# COMMAND GROUP
+# ============================================================
+
+ticket_group = app_commands.Group(
+    name="ticket",
+    description="Ticket system commands."
+)
+
+
+# ============================================================
+# /ticket setup
+# ============================================================
+
+@ticket_group.command(
+    name="setup",
+    description="Setup the ticket system."
+)
+@app_commands.checks.has_permissions(
+    manage_channels=True
+)
+async def ticket_setup(
+    interaction: discord.Interaction
+):
+
+    setup_sessions[
+        interaction.user.id
+    ] = {
+        "title": "",
+        "description": "",
+        "staff_role_id": 0,
+        "category_name": "Tickets",
+        "banner": "",
+        "options": []
+    }
+
+    await interaction.response.send_modal(
+        BasicSetupModal(
+            interaction.user.id
+        )
+    )
+
+
+# ============================================================
+# /ticketadd
+# ============================================================
+
+@app_commands.command(
+    name="ticketadd",
+    description="Add a member to the current ticket."
+)
+@app_commands.describe(
+    member="Member to add."
+)
+async def ticketadd(
+    interaction: discord.Interaction,
+    member: discord.Member
+):
+
+    if not is_ticket_channel(
+        interaction.channel
+    ):
+
+        await interaction.response.send_message(
+            "❌ This command can only be used inside a ticket.",
+            ephemeral=True
+        )
+        return
+
+    if not is_staff(interaction):
+
+        await interaction.response.send_message(
+            "❌ Only staff can add members.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.channel.set_permissions(
+        member,
+        view_channel=True,
+        send_messages=True,
+        read_message_history=True,
+        attach_files=True,
+        embed_links=True
+    )
+
+    await interaction.response.send_message(
+        "✅ "
+        + member.mention
+        + " has been added to this ticket."
+    )
+
+
+# ============================================================
+# /ticketremove
+# ============================================================
+
+@app_commands.command(
+    name="ticketremove",
+    description="Remove a member from the current ticket."
+)
+@app_commands.describe(
+    member="Member to remove."
+)
+async def ticketremove(
+    interaction: discord.Interaction,
+    member: discord.Member
+):
+
+    if not is_ticket_channel(
+        interaction.channel
+    ):
+
+        await interaction.response.send_message(
+            "❌ This command can only be used inside a ticket.",
+            ephemeral=True
+        )
+        return
+
+    if not is_staff(interaction):
+
+        await interaction.response.send_message(
+            "❌ Only staff can remove members.",
+            ephemeral=True
+        )
+        return
+
+    await interaction.channel.set_permissions(
+        member,
+        overwrite=None
+    )
+
+    await interaction.response.send_message(
+        "✅ "
+        + member.mention
+        + " has been removed from this ticket."
+    )
+
+
+# ============================================================
+# COG
 # ============================================================
 
 class Tickets(commands.Cog):
-
-    ticket_group = app_commands.Group(
-        name="ticket",
-        description="Ticket system commands."
-    )
 
     def __init__(self, bot):
 
         self.bot = bot
 
-        # IMPORTANT:
-        # Register /ticket command group
-        bot.tree.add_command(
-            self.ticket_group
-        )
+        # Register /ticket group
+        if bot.tree.get_command(
+            "ticket"
+        ) is None:
+
+            bot.tree.add_command(
+                ticket_group
+            )
+
+        # Register normal commands
+        if bot.tree.get_command(
+            "ticketadd"
+        ) is None:
+
+            bot.tree.add_command(
+                ticketadd
+            )
+
+        if bot.tree.get_command(
+            "ticketremove"
+        ) is None:
+
+            bot.tree.add_command(
+                ticketremove
+            )
 
         # Persistent views
         config = load_config()
 
         bot.add_view(
-            TicketView(
-                config
-            )
+            TicketView(config)
         )
 
         bot.add_view(
@@ -1237,167 +1404,13 @@ class Tickets(commands.Cog):
             DeleteTicketView()
         )
 
-    # ========================================================
-    # /ticket setup
-    # ========================================================
-
-    @ticket_group.command(
-        name="setup",
-        description="Setup the ticket system."
-    )
-    @app_commands.checks.has_permissions(
-        manage_channels=True
-    )
-    async def setup_ticket(
-        self,
-        interaction
-    ):
-
-        setup_sessions[
-            interaction.user.id
-        ] = {
-            "title": "",
-            "description": "",
-            "staff_role_id": 0,
-            "category_name": "Tickets",
-            "banner": "",
-            "options": []
-        }
-
-        await interaction.response.send_modal(
-            BasicSetupModal(
-                interaction.user.id
-            )
-        )
-
-    # ========================================================
-    # /ticketadd
-    # ========================================================
-
-    @app_commands.command(
-        name="ticketadd",
-        description="Add a member to the current ticket."
-    )
-    @app_commands.describe(
-        member="Member to add."
-    )
-    async def ticketadd(
-        self,
-        interaction,
-        member: discord.Member
-    ):
-
-        if not is_ticket_channel(
-            interaction.channel
-        ):
-
-            await interaction.response.send_message(
-                "❌ This command can only be used inside a ticket.",
-                ephemeral=True
-            )
-
-            return
-
-        config = load_config()
-
-        staff_role = get_staff_role(
-            interaction.guild,
-            config
-        )
-
-        if (
-            staff_role
-            and staff_role not in interaction.user.roles
-            and not interaction.user.guild_permissions.manage_channels
-        ):
-
-            await interaction.response.send_message(
-                "❌ Only staff can add members.",
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.channel.set_permissions(
-            member,
-            view_channel=True,
-            send_messages=True,
-            read_message_history=True,
-            attach_files=True,
-            embed_links=True
-        )
-
-        await interaction.response.send_message(
-            "✅ "
-            + member.mention
-            + " has been added to this ticket."
-        )
-
-    # ========================================================
-    # /ticketremove
-    # ========================================================
-
-    @app_commands.command(
-        name="ticketremove",
-        description="Remove a member from the current ticket."
-    )
-    @app_commands.describe(
-        member="Member to remove."
-    )
-    async def ticketremove(
-        self,
-        interaction,
-        member: discord.Member
-    ):
-
-        if not is_ticket_channel(
-            interaction.channel
-        ):
-
-            await interaction.response.send_message(
-                "❌ This command can only be used inside a ticket.",
-                ephemeral=True
-            )
-
-            return
-
-        config = load_config()
-
-        staff_role = get_staff_role(
-            interaction.guild,
-            config
-        )
-
-        if (
-            staff_role
-            and staff_role not in interaction.user.roles
-            and not interaction.user.guild_permissions.manage_channels
-        ):
-
-            await interaction.response.send_message(
-                "❌ Only staff can remove members.",
-                ephemeral=True
-            )
-
-            return
-
-        await interaction.channel.set_permissions(
-            member,
-            overwrite=None
-        )
-
-        await interaction.response.send_message(
-            "✅ "
-            + member.mention
-            + " has been removed from this ticket."
-        )
-
 
 # ============================================================
 # COG SETUP
 # ============================================================
 
 async def setup(bot):
+
     await bot.add_cog(
         Tickets(bot)
     )
